@@ -2,6 +2,7 @@
 import argparse
 import html
 import json
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -39,7 +40,9 @@ def build(output: Path, site_url: str = ""):
             text = text.replace('<head>', '<head>\n<meta name="robots" content="noindex,nofollow,noarchive">\n'
                                 + '<meta http-equiv="Content-Security-Policy" content="' + html.escape(CSP, quote=True) + '">')
             if site_url:
-                text = text.replace('content="og-cover.jpg"', 'content="' + html.escape(site_url.rstrip("/") + "/og-cover.jpg", quote=True) + '"')
+                image_url = html.escape(site_url.rstrip("/") + "/og-cover.jpg", quote=True)
+                text = re.sub(r'(<meta property="og:image" content=")[^"]*(">)',
+                              lambda match: match[1] + image_url + match[2], text)
             (output / name).write_text(text, encoding="utf-8")
         else:
             shutil.copyfile(source, output / name)

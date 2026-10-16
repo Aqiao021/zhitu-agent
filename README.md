@@ -1,6 +1,6 @@
 # 职途助手 · 高职生求职差距诊断 Agent
 
-> 线上体验地址：待部署完成后填写。
+> 线上体验地址：[打开职途助手](https://aqiao021.github.io/zhitu-agent/) · [本机记录](https://aqiao021.github.io/zhitu-agent/stats.html)
 
 ## 网页版：自带密钥，无需购买服务器
 
