@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="职途助手：对照真实招聘要求，逐条诊断能力差距，生成补差计划，模拟面试。每条结论都有简历原文依据。">
+<meta name="theme-color" content="#0B1B33">
+<title>职途助手 · 求职差距诊断</title>
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0B1B33">
+<meta property="og:type" content="website">
+<meta property="og:title" content="职途助手 · 高职生求职差距诊断 Agent">
+<meta property="og:description" content="看清差距，补齐短板，从容求职。对照真实招聘要求逐条诊断，生成 4 周补差计划和模拟面试。">
+<meta property="og:image" content="og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@600;700;900&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">跳到主要内容</a>
+
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#/" aria-label="职途助手首页">
+      <svg class="brand-mark" viewBox="64 64 896 896" aria-hidden="true"><rect x="64" y="64" width="896" height="896" rx="152" fill="currentColor"/><path d="M224 764L368 620H464L592 468H680L800 328" fill="none" stroke="#fff" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/><circle cx="800" cy="328" r="50" fill="#FFC56B"/></svg>
+      <span class="brand-name">职途助手</span>
+    </a>
+    <nav class="nav-links" aria-label="主导航">
+      <a href="#/" data-route="home">首页</a>
+      <a href="#/app/diagnose" data-route="app">工作台</a>
+      <a href="#/about" data-route="about">原理与隐私</a>
+    </nav>
+    <div class="nav-right">
+      <span id="mode" class="mode" title="服务状态">连接中</span>
+      <a class="btn btn-primary btn-sm nav-cta" href="#/app/diagnose">开始诊断</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <!-- ============================================================ HOME -->
+  <div class="view" id="view-home">
+    <section class="hero">
+      <div class="hero-bg" aria-hidden="true"></div>
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow fade-up">面向高职学生的 AI 求职规划工具</p>
+          <h1 class="fade-up d1">看清岗位要求<br><span class="hl">补齐能力差距</span></h1>
+          <p class="lead fade-up d2">粘贴简历和一条真实招聘信息，职途助手逐条对照岗位要求，告诉你哪些已经具备、哪些还缺，并生成 4 周补差计划和针对短板的模拟面试。</p>
+          <div class="hero-actions fade-up d3">
+            <a class="btn btn-primary btn-lg" href="#/app/diagnose">免费开始诊断 <span data-icon="arrow"></span></a>
+            <a class="btn btn-ghost btn-lg" href="#/app/diagnose?sample=1">用示例体验</a>
+          </div>
+          <ul class="hero-points fade-up d4">
+            <li><span data-icon="check"></span>每条结论附简历原文</li>
+            <li><span data-icon="check"></span>匹配度由程序计算</li>
+            <li><span data-icon="check"></span>自动隐藏手机号等隐私</li>
+          </ul>
+        </div>
+        <div class="hero-visual fade-up d2" aria-hidden="true">
+          <div class="mock">
+            <div class="mock-head">
+              <div class="mock-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" class="trk"/><circle cx="60" cy="60" r="50" class="val" style="stroke-dasharray:314;stroke-dashoffset:110"/></svg><div><b>65</b><small>匹配度</small></div></div>
+              <div><div class="mock-title">AI 应用开发实习生</div><div class="mock-pills"><span class="st st-have">具备 3</span><span class="st st-part">部分 2</span><span class="st st-miss">缺少 2</span></div></div>
+            </div>
+            <div class="mock-row miss"><span class="dot"></span><div><b>了解 Linux 常用命令</b><small>建议：在虚拟机完成 20 个常用命令练习</small></div><span class="st st-miss">缺少</span></div>
+            <div class="mock-row part"><span class="dot"></span><div><b>熟悉 Git 协作</b><small class="quote">“了解 Git 基本操作”</small></div><span class="st st-part">部分</span></div>
+            <div class="mock-row have"><span class="dot"></span><div><b>大模型 API 调用</b><small class="quote">“用 Python 调用大模型 API”</small></div><span class="st st-have">具备</span></div>
+            <div class="mock-foot"><span data-icon="shield"></span>依据已逐字核验 · 已隐藏手机号 1 处</div>
+          </div>
+          <div class="float-card fc1"><span data-icon="calendar"></span><div><b>4 周补差计划</b><small>每项都有验收标准</small></div></div>
+          <div class="float-card fc2"><span data-icon="mic"></span><div><b>模拟面试 5 题</b><small>五维评分</small></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="strip">
+      <div class="container strip-grid">
+        <div><b class="num">5–12</b><span>条岗位要求逐条对照</span></div>
+        <div><b class="num">4</b><span>周补差计划，含验收标准</span></div>
+        <div><b class="num">5</b><span>道针对短板的面试题</span></div>
+        <div><b class="num" id="docCount">8</b><span>份带出处的公开资料</span></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <p class="eyebrow center reveal">三步完成</p>
+        <h2 class="center reveal">从“不知道差在哪”，到“知道每周做什么”</h2>
+        <ol class="steps">
+          <li class="reveal"><span class="step-no">01</span><span class="step-ic" data-icon="file"></span><h3>差距诊断</h3><p>粘贴简历和招聘信息，岗位要求被拆成可检查的条目，逐条标出具备、部分具备或缺少，并引用简历原文。</p></li>
+          <li class="reveal"><span class="step-no">02</span><span class="step-ic" data-icon="calendar"></span><h3>补差计划</h3><p>按你每周能投入的时间，生成 4 周任务清单。每个任务都写明怎样算完成，可勾选进度、打印保存。</p></li>
+          <li class="reveal"><span class="step-no">03</span><span class="step-ic" data-icon="mic"></span><h3>模拟面试</h3><p>面试官围绕你的短板连续提问，回答空泛会被追问；结束后五个维度打分，并给出改写示范。</p></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="section dark">
+      <div class="container two-col">
+        <div class="reveal">
+          <p class="eyebrow light">可信设计</p>
+          <h2>不让 AI 随口下结论</h2>
+          <p class="muted-light">求职建议说错了，代价由学生承担。所以职途助手把“模型说的”和“程序核验的”分开处理。</p>
+        </div>
+        <div class="trust-grid">
+          <div class="trust reveal"><span data-icon="quote"></span><h3>依据逐字核验</h3><p>模型引用的简历原文，程序会逐字比对；找不到原文就自动降级，并标明原因。</p></div>
+          <div class="trust reveal"><span data-icon="gauge"></span><h3>分数由程序计算</h3><p>匹配度 = 具备 1 分、部分 0.5 分、缺少 0 分的平均值，不让模型“拍”分数。</p></div>
+          <div class="trust reveal"><span data-icon="lock"></span><h3>隐私先处理</h3><p>发送前自动隐藏手机号、身份证号、邮箱、QQ/微信号和住址；不保存简历原文。</p></div>
+          <div class="trust reveal"><span data-icon="book"></span><h3>回答都有出处</h3><p>就业问答只依据国家职业标准、政策文件和学校公开信息作答，逐句标注来源。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container cta-box reveal">
+        <div>
+          <h2>准备好了解自己离目标岗位还有多远了吗？</h2>
+          <p class="muted">大约 1 分钟出结果。建议使用真实招聘信息，诊断会更准确。</p>
+        </div>
+        <a class="btn btn-primary btn-lg" href="#/app/diagnose">开始诊断 <span data-icon="arrow"></span></a>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============================================================ APP -->
+  <div class="view" id="view-app">
+    <div class="app">
+      <aside class="side" aria-label="工作台步骤">
+        <div class="side-title">工作台</div>
+        <a class="side-item" href="#/app/diagnose" data-tab="diagnose"><span class="si-ic" data-icon="file"></span><span><b>差距诊断</b><small id="st-diagnose">第一步</small></span></a>
+        <a class="side-item" href="#/app/plan" data-tab="plan"><span class="si-ic" data-icon="calendar"></span><span><b>补差计划</b><small id="st-plan">需先诊断</small></span></a>
+        <a class="side-item" href="#/app/interview" data-tab="interview"><span class="si-ic" data-icon="mic"></span><span><b>模拟面试</b><small id="st-interview">需先诊断</small></span></a>
+        <a class="side-item" href="#/app/ask" data-tab="ask"><span class="si-ic" data-icon="chat"></span><span><b>就业问答</b><small>随时可问</small></span></a>
+        <div class="side-note"><span data-icon="shield"></span><p>你的简历只用于本次分析，不会被保存。</p></div>
+      </aside>
+
+      <section class="work">
+        <!-- 诊断 -->
+        <div class="pane" id="pane-diagnose">
+          <header class="pane-head">
+            <div><p class="eyebrow">Step 01</p><h2>差距诊断</h2><p class="muted">粘贴简历和一条想投的招聘信息，逐条对照岗位要求。</p></div>
+            <button class="btn btn-ghost btn-sm" id="btnSample" type="button"><span data-icon="sparkle"></span>载入示例</button>
+          </header>
+          <div class="inputs">
+            <div class="field">
+              <div class="field-top"><label for="resume">我的简历</label><span class="count" id="cResume">0 字</span></div>
+              <textarea id="resume" placeholder="教育经历、技能、项目经历、获奖……&#10;建议写清每段经历中你具体负责的部分。"></textarea>
+              <div class="field-bottom"><label class="file"><input type="file" id="resumeFile" accept=".txt,.md"><span data-icon="upload"></span>导入 .txt</label><span class="hint">手机号等隐私会被自动隐藏</span></div>
+            </div>
+            <div class="field">
+              <div class="field-top"><label for="jd">招聘信息</label><span class="count" id="cJd">0 字</span></div>
+              <textarea id="jd" placeholder="从招聘网站复制岗位名称、岗位职责、任职要求……"></textarea>
+              <div class="field-bottom"><span class="hint">只复制“职责”和“要求”部分效果最好</span></div>
+            </div>
+          </div>
+          <div class="bar-actions">
+            <p class="privacy"><span data-icon="lock"></span>发送前自动隐藏手机号、身份证号、邮箱、QQ/微信号、住址</p>
+            <button class="btn btn-primary" id="btnDiagnose" type="button">开始诊断 <span data-icon="arrow"></span></button>
+          </div>
+          <div id="diagResult" aria-live="polite"></div>
+        </div>
+
+        <!-- 计划 -->
+        <div class="pane" id="pane-plan">
+          <header class="pane-head"><div><p class="eyebrow">Step 02</p><h2>4 周补差计划</h2><p class="muted">按诊断出的差距和你的可用时间安排任务，每项都有验收标准。</p></div></header>
+          <div class="need" id="planNeed"><span data-icon="file"></span><p>请先完成一次差距诊断</p><a class="btn btn-primary btn-sm" href="#/app/diagnose">去诊断</a></div>
+          <div class="hours hidden" id="planForm">
+            <div class="hours-label"><span>每周能投入</span><b><span id="hoursVal">10</span> 小时</b></div>
+            <input type="range" id="hours" min="3" max="30" value="10" aria-label="每周可投入小时数">
+            <button class="btn btn-primary" id="btnPlan" type="button">生成计划 <span data-icon="arrow"></span></button>
+          </div>
+          <div id="planResult" aria-live="polite"></div>
+        </div>
+
+        <!-- 面试 -->
+        <div class="pane" id="pane-interview">
+          <header class="pane-head"><div><p class="eyebrow">Step 03</p><h2>模拟面试</h2><p class="muted">共 5 题，围绕你的短板提问；回答空泛会被追问。</p></div></header>
+          <div class="need" id="ivNeed"><span data-icon="file"></span><p>请先完成一次差距诊断</p><a class="btn btn-primary btn-sm" href="#/app/diagnose">去诊断</a></div>
+          <div id="ivArea" class="hidden">
+            <div class="iv-top"><div class="iv-progress" id="ivProgress"></div><button class="btn btn-primary btn-sm" id="btnIvStart" type="button">开始面试</button></div>
+            <div class="chat" id="ivChat" aria-live="polite"></div>
+            <div class="composer hidden" id="ivComposer">
+              <textarea id="ivAnswer" placeholder="像真实面试一样作答：在什么情况下、你做了什么、怎么做、结果如何。"></textarea>
+              <div class="composer-bar"><span class="hint" id="cIv">建议 80～300 字</span><button class="btn btn-primary btn-sm" id="btnIvNext" type="button">提交回答 <span data-icon="send"></span></button></div>
+            </div>
+            <div id="ivResult"></div>
+          </div>
+        </div>
+
+        <!-- 问答 -->
+        <div class="pane" id="pane-ask">
+          <header class="pane-head"><div><p class="eyebrow">Knowledge</p><h2>就业问答</h2><p class="muted">只依据资料库回答，每句话都标出处；资料库没有的内容会直接说明。</p></div></header>
+          <form class="search" id="askForm">
+            <span data-icon="search"></span>
+            <input id="question" placeholder="例如：大专毕业多久能申报人工智能工程技术人员初级？" maxlength="300" autocomplete="off">
+            <button class="btn btn-primary btn-sm" id="btnAsk" type="submit">提问</button>
+          </form>
+          <div class="chips" id="askChips">
+            <button type="button" class="chip">大专毕业多久能申报人工智能工程技术人员初级？</button>
+            <button type="button" class="chip">学校毕业生就业率是多少？</button>
+            <button type="button" class="chip">生成式人工智能系统应用员是哪年成为新职业的？</button>
+            <button type="button" class="chip">面试前怎么准备项目介绍？</button>
+            <button type="button" class="chip">求职时遇到收押金怎么办？</button>
+          </div>
+          <div id="askResult" aria-live="polite"></div>
+          <details class="docs"><summary><span data-icon="book"></span>资料库收录的文件</summary><ul id="docList"></ul></details>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============================================================ ABOUT -->
+  <div class="view" id="view-about">
+    <section class="section">
+      <div class="container narrow">
+        <p class="eyebrow">原理与隐私</p>
+        <h2>职途助手是怎么工作的</h2>
+        <div class="prose">
+          <h3>1. 诊断流程</h3>
+          <p>系统先在本地隐藏简历中的个人信息，再把简历和招聘信息交给大模型，让它拆解岗位要求、判断状态并引用简历原文。返回结果后，程序逐字核验每一条引用：原文在简历中找不到，就把该条从“具备”降为“部分具备”，并在页面上说明原因。匹配度由程序按统一规则计算。</p>
+          <h3>2. 资料库</h3>
+          <p>就业问答使用本地资料库检索（SQLite 全文索引），只把检索到的片段交给模型，并要求逐句标注编号；程序会删除不存在的引用编号。资料库中的每份文件都写明发布单位、日期和原文链接。</p>
+          <h3>3. 隐私</h3>
+          <p>手机号、身份证号、邮箱、QQ/微信号、住址在发送前被替换为“[已隐藏]”。服务器不保存简历和招聘信息原文，只记录功能使用次数、耗时和你主动提交的评分，用于改进工具。</p>
+          <h3>4. 诚信</h3>
+          <p>职途助手只帮你找差距、做计划、练表达，不会帮你编造经历、夸大成果或伪造证书。如果发现简历中的表述无法证实，会提醒你如实修改。</p>
+          <h3>5. 局限</h3>
+          <p>诊断质量取决于所接入的大模型和招聘信息的完整程度，结果仅供参考。政策和学校信息请以官方最新发布为准，求职决定建议结合就业指导老师的意见。</p>
+        </div>
+        <a class="btn btn-primary" href="#/app/diagnose">开始诊断 <span data-icon="arrow"></span></a>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="foot">
+  <div class="container foot-inner">
+    <div class="brand foot-brand"><svg class="brand-mark" viewBox="64 64 896 896" aria-hidden="true"><rect x="64" y="64" width="896" height="896" rx="152" fill="currentColor"/><path d="M224 764L368 620H464L592 468H680L800 328" fill="none" stroke="#fff" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/><circle cx="800" cy="328" r="50" fill="#FFC56B"/></svg><span>职途助手</span></div>
+    <p>漳州职业技术学院 · 人工智能学院 学生作品。诊断与评分仅供参考。</p>
+  </div>
+</footer>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>
