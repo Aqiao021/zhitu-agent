@@ -2,6 +2,7 @@ import json
 import sys
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -139,6 +140,46 @@ class AskTest(unittest.TestCase):
 
 
 class StoreTest(unittest.TestCase):
+    def test_model_quota_survives_reopen_and_resets_on_next_utc_day(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "quota.db"
+            s = Store(path)
+            try:
+                self.assertTrue(s.reserve_model_call(10, 2, now=86410))
+                self.assertTrue(s.reserve_model_call(10, 2, now=86411))
+                self.assertFalse(s.reserve_model_call(10, 2, now=87020))
+            finally:
+                s.db.close()
+            s = Store(path)
+            try:
+                self.assertFalse(s.reserve_model_call(10, 2, now=87021))
+                self.assertTrue(s.reserve_model_call(10, 2, now=172810))
+            finally:
+                s.db.close()
+
+    def test_model_quota_is_a_sliding_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            s = Store(Path(tmp) / "quota.db")
+            try:
+                self.assertTrue(s.reserve_model_call(2, 10, now=1000))
+                self.assertTrue(s.reserve_model_call(2, 10, now=1100))
+                self.assertFalse(s.reserve_model_call(2, 10, now=1201))
+                self.assertTrue(s.reserve_model_call(2, 10, now=1601))
+            finally:
+                s.db.close()
+
+    def test_model_quota_is_atomic_across_connections(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "quota.db"
+            stores = [Store(path), Store(path)]
+            try:
+                with ThreadPoolExecutor(max_workers=8) as pool:
+                    accepted = list(pool.map(lambda i: stores[i % 2].reserve_model_call(3, 100, now=1000), range(12)))
+                self.assertEqual(sum(accepted), 3)
+            finally:
+                for s in stores:
+                    s.db.close()
+
     def test_stats_and_csv(self):
         with tempfile.TemporaryDirectory() as tmp:
             s = Store(Path(tmp) / "t.db")

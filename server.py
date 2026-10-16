@@ -1,6 +1,7 @@
 """职途助手 — 本地网页服务（只用 Python 标准库）。运行：python server.py"""
 import json
 import mimetypes
+import secrets
 import socket
 import sys
 import threading
@@ -26,23 +27,27 @@ KB = KnowledgeBase(ROOT / "kb")
 AGENT = Agent(DemoLLM() if CFG.demo else LLM(CFG), KB)
 STORE = Store(CFG.data_dir / "zhitu.db")
 SLOTS = threading.BoundedSemaphore(max(1, int(CFG.max_concurrency)))
-_HITS: dict[str, deque] = {}
+_HITS: dict[tuple[str, str, int], deque] = {}
 _HITS_LOCK = threading.Lock()
 
 
-def allow(ip: str) -> bool:
-    """Sliding-window rate limit: rate_limit model calls per IP per 10 minutes."""
-    now = time.time()
+def allow(ip: str, bucket: str = "model", limit: int | None = None, window: int = 600) -> bool:
+    """Bounded sliding-window limiter; feedback and model requests have separate buckets."""
+    now = time.monotonic()
+    limit = int(CFG.rate_limit if limit is None else limit)
+    key = (bucket, ip, window)
     with _HITS_LOCK:
-        q = _HITS.setdefault(ip, deque())
-        while q and now - q[0] > 600:
+        if key not in _HITS and len(_HITS) >= 5000:
+            for k in [k for k, v in _HITS.items() if not v or now - v[-1] >= k[2]]:
+                _HITS.pop(k, None)
+            if len(_HITS) >= 5000:
+                return False
+        q = _HITS.setdefault(key, deque())
+        while q and now - q[0] >= window:
             q.popleft()
-        if len(q) >= int(CFG.rate_limit):
+        if len(q) >= limit:
             return False
         q.append(now)
-        if len(_HITS) > 5000:  # bound memory
-            for k in [k for k, v in _HITS.items() if not v][:1000]:
-                _HITS.pop(k, None)
         return True
 
 CSP = ("default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
@@ -54,7 +59,11 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "Zhitu/1.0"
 
     def log_message(self, fmt, *args):  # quieter console; never log request bodies
-        sys.stderr.write("%s %s\n" % (self.address_string(), fmt % args))
+        message = fmt % args
+        path = getattr(self, "path", "")
+        if path:
+            message = message.replace(path, urlparse(path).path)
+        sys.stderr.write("%s %s\n" % (self.address_string(), message))
 
     # ------------------------------------------------------------ helpers
     def _send(self, code: int, body: bytes, ctype: str, extra: dict | None = None):
@@ -65,6 +74,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Security-Policy", CSP)
         self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("X-Robots-Tag", "noindex, nofollow, noarchive")
         for k, v in (extra or {}).items():
             self.send_header(k, v)
         self.end_headers()
@@ -80,12 +90,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def _admin_ok(self) -> bool:
         token = parse_qs(urlparse(self.path).query).get("token", [""])[0]
-        local = self._ip() in ("127.0.0.1", "::1") and not self.headers.get("X-Forwarded-For")
-        return local or (CFG.admin_token and token == CFG.admin_token)
+        if CFG.admin_token:
+            return secrets.compare_digest(token.encode("utf-8"), CFG.admin_token.encode("utf-8"))
+        return (not CFG.trust_proxy and self.client_address[0] in ("127.0.0.1", "::1")
+                and not self.headers.get("X-Forwarded-For"))
 
     # ------------------------------------------------------------ GET
     def do_GET(self):
         path = urlparse(self.path).path
+        if path == "/robots.txt":
+            return self._send(200, b"User-agent: *\nDisallow: /\n", "text/plain; charset=utf-8")
+        if path in ("/stats", "/stats.html") and not self._admin_ok():
+            return self._json(403, {"error": "访问统计页需要正确口令"})
         if path == "/api/health":
             return self._json(200, {"ok": True, "demo": CFG.demo, "model": "演示模式" if CFG.demo else CFG.model,
                                     "documents": KB.documents()})
@@ -130,6 +146,9 @@ class Handler(BaseHTTPRequestHandler):
             "/api/ask": lambda: AGENT.ask(str(body.get("question", ""))),
         }
         if path == "/api/feedback":
+            if (not allow(self._ip(), "feedback", CFG.feedback_rate_limit, 60)
+                    or not allow("*", "feedback-global", 120, 60)):
+                return self._json(429, {"error": "反馈提交过于频繁，请一分钟后再试"})
             try:
                 STORE.feedback(str(body.get("kind", "")), int(body.get("rating", 0)), body.get("useful"),
                                str(body.get("comment", "")), session)
@@ -141,10 +160,12 @@ class Handler(BaseHTTPRequestHandler):
         kind = path.rsplit("/", 1)[1]
         if not CFG.demo and not allow(self._ip()):
             return self._json(429, {"error": "使用太频繁啦，请 10 分钟后再试"})
-        if not SLOTS.acquire(timeout=30):
+        if not SLOTS.acquire(blocking=False):
             return self._json(503, {"error": "当前使用人数较多，请稍后再试"})
         t0 = time.time()
         try:
+            if not CFG.demo and not STORE.reserve_model_call(CFG.global_rate_limit, CFG.daily_limit):
+                return self._json(429, {"error": "全站模型请求已达保护上限，请稍后再试或联系管理员"})
             result = routes[path]()
         except ModelError as e:
             STORE.event(kind, False, int((time.time() - t0) * 1000), None, session, CFG.demo)

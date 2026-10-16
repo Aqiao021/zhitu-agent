@@ -18,6 +18,9 @@ class Config:
     port: int = 8000
     admin_token: str = ""             # 统计页口令；为空时只允许本机访问统计
     rate_limit: int = 30              # 每个 IP 每 10 分钟最多调用模型的次数（公网部署防刷）
+    global_rate_limit: int = 120      # 全站每 10 分钟的模型请求上限
+    daily_limit: int = 1000           # 全站每天（UTC）的模型请求上限，存入持久化数据库
+    feedback_rate_limit: int = 10     # 每个 IP 每分钟最多提交反馈的次数
     max_concurrency: int = 4          # 同时处理的模型请求数上限
     trust_proxy: bool = False         # 部署在 Nginx/云平台反向代理后面时设为 true，按 X-Forwarded-For 识别 IP
     data_dir: Path = field(default_factory=lambda: ROOT / "data")
@@ -39,13 +42,15 @@ def load(path: Path | None = None) -> Config:
         "ZHITU_PROVIDER": "provider", "ZHITU_BASE_URL": "base_url", "ZHITU_API_KEY": "api_key",
         "ZHITU_MODEL": "model", "ZHITU_PORT": "port", "ZHITU_ADMIN_TOKEN": "admin_token", "ZHITU_HOST": "host",
         "ZHITU_RATE_LIMIT": "rate_limit", "ZHITU_MAX_CONCURRENCY": "max_concurrency", "ZHITU_TRUST_PROXY": "trust_proxy",
+        "ZHITU_GLOBAL_RATE_LIMIT": "global_rate_limit", "ZHITU_DAILY_LIMIT": "daily_limit",
+        "ZHITU_FEEDBACK_RATE_LIMIT": "feedback_rate_limit",
         "ZHITU_TIMEOUT": "timeout", "PORT": "port",
     }
     for e, k in env.items():
         v = os.environ.get(e)
         if not v:
             continue
-        if k in ("port", "rate_limit", "max_concurrency", "timeout"):
+        if k in ("port", "rate_limit", "max_concurrency", "timeout", "global_rate_limit", "daily_limit", "feedback_rate_limit"):
             setattr(cfg, k, int(v))
         elif k == "trust_proxy":
             setattr(cfg, k, v.lower() in ("1", "true", "yes"))

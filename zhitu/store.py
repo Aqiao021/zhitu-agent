@@ -17,8 +17,27 @@ class Store:
                 score INTEGER, session TEXT, demo INTEGER);
             CREATE TABLE IF NOT EXISTS feedback(id INTEGER PRIMARY KEY, ts REAL, kind TEXT, rating INTEGER,
                 useful INTEGER, comment TEXT, session TEXT);
+            CREATE TABLE IF NOT EXISTS model_requests(id INTEGER PRIMARY KEY, ts REAL NOT NULL);
+            CREATE INDEX IF NOT EXISTS model_requests_ts ON model_requests(ts);
             """)
             self.db.commit()
+
+    def reserve_model_call(self, window_limit: int, daily_limit: int, now: float | None = None) -> bool:
+        """Reserve before calling the model; persist limits across restarts and failures."""
+        now = time.time() if now is None else now
+        day_start = (int(now) // 86400) * 86400  # UTC
+        with self.lock, self.db:
+            # Serialize the check and insert even when another process opens this DB.
+            self.db.execute("BEGIN IMMEDIATE")
+            self.db.execute("DELETE FROM model_requests WHERE ts < ?", (min(day_start, now - 600),))
+            recent, daily = self.db.execute(
+                "SELECT COALESCE(SUM(ts > ?), 0), COALESCE(SUM(ts >= ?), 0) FROM model_requests",
+                (now - 600, day_start),
+            ).fetchone()
+            if recent >= int(window_limit) or daily >= int(daily_limit):
+                return False
+            self.db.execute("INSERT INTO model_requests(ts) VALUES(?)", (now,))
+            return True
 
     def event(self, kind: str, ok: bool, ms: int, score: int | None, session: str, demo: bool):
         with self.lock:
