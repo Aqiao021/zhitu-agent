@@ -38,12 +38,15 @@
     </nav>
     <div class="nav-right">
       <span id="mode" class="mode" title="服务状态">连接中</span>
+      <button class="btn btn-ghost btn-sm static-only" id="btnConnect" type="button">连接模型</button>
+      <a class="btn btn-ghost btn-sm static-only" href="stats.html">本机记录</a>
       <a class="btn btn-primary btn-sm nav-cta" href="#/app/diagnose">开始诊断</a>
     </div>
   </div>
 </header>
 
 <main id="main">
+  <div class="container static-only"><div class="connection-notice"><span id="connectionHint" role="status">请先连接你自己的模型密钥。密钥仅在当前页面内存中使用，刷新后清除。</span><small>网页免费；模型调用由你的服务商计费。记录仅保存在本机浏览器，不汇总其他人的数据。</small></div></div>
   <!-- ============================================================ HOME -->
   <div class="view" id="view-home">
     <section class="hero">
@@ -54,7 +57,7 @@
           <h1 class="fade-up d1">看清岗位要求<br><span class="hl">补齐能力差距</span></h1>
           <p class="lead fade-up d2">粘贴简历和一条真实招聘信息，职途助手逐条对照岗位要求，告诉你哪些已经具备、哪些还缺，并生成 4 周补差计划和针对短板的模拟面试。</p>
           <div class="hero-actions fade-up d3">
-            <a class="btn btn-primary btn-lg" href="#/app/diagnose">免费开始诊断 <span data-icon="arrow"></span></a>
+            <a class="btn btn-primary btn-lg" href="#/app/diagnose">开始诊断 <span data-icon="arrow"></span></a>
             <a class="btn btn-ghost btn-lg" href="#/app/diagnose?sample=1">用示例体验</a>
           </div>
           <ul class="hero-points fade-up d4">
@@ -225,9 +228,9 @@
           <h3>1. 诊断流程</h3>
           <p>系统先在本地隐藏简历中的个人信息，再把简历和招聘信息交给大模型，让它拆解岗位要求、判断状态并引用简历原文。返回结果后，程序逐字核验每一条引用：原文在简历中找不到，就把该条从“具备”降为“部分具备”，并在页面上说明原因。匹配度由程序按统一规则计算。</p>
           <h3>2. 资料库</h3>
-          <p>就业问答使用本地资料库检索（SQLite 全文索引），只把检索到的片段交给模型，并要求逐句标注编号；程序会删除不存在的引用编号。资料库中的每份文件都写明发布单位、日期和原文链接。</p>
+          <p id="kbDescription">就业问答使用本地资料库检索（SQLite 全文索引），只把检索到的片段交给模型，并要求逐句标注编号；程序会删除不存在的引用编号。资料库中的每份文件都写明发布单位、日期和原文链接。</p>
           <h3>3. 隐私</h3>
-          <p>手机号、身份证号、邮箱、QQ/微信号、住址在发送前被替换为“[已隐藏]”。服务器不保存简历和招聘信息原文，只记录功能使用次数、耗时和你主动提交的评分，用于改进工具。</p>
+          <p id="privacyDescription">手机号、身份证号、邮箱、QQ/微信号、住址在发送前被替换为“[已隐藏]”。服务器不保存简历和招聘信息原文，只记录功能使用次数、耗时和你主动提交的评分，用于改进工具。</p>
           <h3>4. 诚信</h3>
           <p>职途助手只帮你找差距、做计划、练表达，不会帮你编造经历、夸大成果或伪造证书。如果发现简历中的表述无法证实，会提醒你如实修改。</p>
           <h3>5. 局限</h3>
@@ -247,6 +250,22 @@
 </footer>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<dialog id="modelDialog" class="model-dialog static-only" aria-labelledby="modelTitle" aria-describedby="modelHelp">
+  <div class="model-head"><h2 id="modelTitle">连接你自己的模型</h2><button id="closeModel" class="btn btn-ghost btn-sm" type="button" aria-label="关闭连接设置">关闭</button></div>
+  <p id="modelHelp" class="muted">密钥仅保留在当前页面内存中，只发给下方模型服务商；不会上传到 GitHub。验证会发出一次很短的模型请求，按服务商规则计费。</p>
+  <form id="modelForm" autocomplete="off">
+    <label for="modelKey">API Key</label>
+    <input id="modelKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" required maxlength="512" placeholder="填写你自己的 API Key">
+    <label for="modelBase">服务商接口地址</label>
+    <input id="modelBase" type="url" value="https://api.deepseek.com/v1" required spellcheck="false">
+    <label for="modelName">模型名称</label>
+    <input id="modelName" value="deepseek-chat" required maxlength="100" spellcheck="false">
+    <p class="hint">默认使用 DeepSeek。其他服务商必须支持 OpenAI 兼容聊天接口和浏览器跨域调用。只向你信任的服务商发送密钥。</p>
+    <p id="modelMessage" role="status" aria-live="polite"></p>
+    <div class="model-actions"><button id="disconnectModel" class="btn btn-ghost" type="button">清除密钥</button><button id="saveModel" class="btn btn-primary" type="submit" disabled>验证并连接</button></div>
+  </form>
+</dialog>
+<script src="browser-client.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

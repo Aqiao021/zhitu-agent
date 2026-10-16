@@ -38,6 +38,8 @@ function icon(name) {
 }
 function hydrateIcons(root = document) { $$("[data-icon]", root).forEach((el) => { if (!el.firstChild) el.innerHTML = icon(el.dataset.icon); }); }
 const I = (n) => `<span data-icon="${n}">${icon(n)}</span>`;
+const STATIC_MODE = document.documentElement.dataset.mode === "static";
+let browserClient = null;
 
 /* ------------------------------------------------------------------ utils */
 const store = {
@@ -50,6 +52,15 @@ function toast(msg, err = false) {
   clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 4200);
 }
 async function api(path, body) {
+  if (STATIC_MODE) {
+    await browserReady;
+    if (!browserClient) throw new Error("页面资料加载失败，请刷新后重试");
+    if (browserClient.status === "disconnected" && path !== "/api/feedback") {
+      openModel();
+      throw new Error("请先连接模型，填写你自己的 API Key");
+    }
+    return browserClient.request(path, body);
+  }
   const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 150000);
   try {
     const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, session: session() }), signal: ctrl.signal });
@@ -104,11 +115,61 @@ function setupReveal() {
 }
 
 /* ------------------------------------------------------------------ health */
-fetch("/api/health").then((r) => r.json()).then((h) => {
-  const m = $("#mode"); m.textContent = h.demo ? "演示模式" : "AI 已连接"; m.title = h.demo ? "未配置 API Key，使用规则演示" : "模型：" + h.model;
-  m.classList.toggle("demo", h.demo);
+function showDocuments(h) {
   $("#docCount").textContent = h.documents.length;
   $("#docList").innerHTML = h.documents.map((d) => `<li>${esc(d.title)}（${esc(d.source)}${d.date ? "，" + esc(d.date) : ""}）${d.url ? ` <a href="${esc(d.url)}" target="_blank" rel="noopener">原文</a>` : ""}</li>`).join("");
+}
+function openModel() { $("#modelDialog").showModal(); $("#modelKey").focus(); }
+function showConnection(status) {
+  const text = { disconnected: "待连接模型", configured: "尚未验证", connected: "AI 已连接" }[status];
+  $("#mode").textContent = text;
+  $("#mode").classList.toggle("off", status !== "connected");
+  $("#connectionHint").textContent = status === "connected" ? "AI 已连接。密钥仅在当前页面内存中使用，刷新或关闭后清除。" : status === "configured" ? "密钥已填写，但尚未通过连接验证。请检查设置后重试。" : "请先连接你自己的模型密钥。密钥仅在当前页面内存中使用，刷新后清除。";
+  $("#mode").title = $("#connectionHint").textContent;
+}
+const browserReady = STATIC_MODE ? (async () => {
+  showConnection("disconnected");
+  $("#kbDescription").textContent = "资料检索、引用核验和评分在你的浏览器中完成。就业问答只把检索到的公开资料片段交给你选择的模型，并删除不存在的引用编号。每份资料都列出发布单位、日期和原文链接。";
+  $("#privacyDescription").textContent = "手机号、身份证号、邮箱、QQ/微信号、住址在发送前被遮盖，再直接发给你选择的模型服务商。API Key 只在当前页面内存中保留，不写入浏览器存储。诊断结果（含已遮盖的引用）、计划、进度和使用记录保存在本机浏览器，可在“本机记录”页导出或清除；清除浏览器数据后无法恢复。不同设备、不同浏览器之间不自动同步。";
+  try {
+    const response = await fetch("model-data.json", { cache: "no-cache" });
+    if (!response.ok) throw new Error("资料库加载失败");
+    const data = await response.json();
+    browserClient = new ZhituBrowser.Client({ data, onStatus: showConnection, onStorageError: message => toast(message, true) });
+    showDocuments(data);
+    $("#saveModel").disabled = false;
+  } catch (_) {
+    $("#mode").textContent = "资料加载失败";
+    $("#connectionHint").textContent = "页面资料加载失败，请检查网络后刷新。";
+    $("#modelMessage").textContent = "页面资料加载失败，请检查网络后刷新。";
+  }
+})() : Promise.resolve();
+if (STATIC_MODE) {
+  $("#btnConnect").addEventListener("click", openModel);
+  $("#closeModel").addEventListener("click", () => { $("#modelKey").value = ""; $("#modelDialog").close(); });
+  $("#modelDialog").addEventListener("close", () => { $("#modelKey").value = ""; });
+  $("#disconnectModel").addEventListener("click", () => { browserClient?.disconnect(); $("#modelKey").value = ""; $("#modelMessage").textContent = "当前页面的密钥已清除。"; });
+  window.addEventListener("pagehide", () => { browserClient?.disconnect(); $("#modelKey").value = ""; });
+  $("#modelForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    await browserReady;
+    if (!browserClient) return;
+    await busy($("#saveModel"), "验证中", async () => {
+      browserClient.configure({ key: $("#modelKey").value, baseURL: $("#modelBase").value, model: $("#modelName").value });
+      $("#modelKey").value = "";
+      $("#modelMessage").textContent = "正在验证连接…";
+      try {
+        await browserClient.request("/api/test");
+        $("#modelMessage").textContent = "连接成功。";
+        $("#modelDialog").close();
+        toast("AI 已连接，可以开始诊断了");
+      } catch (error) { $("#modelMessage").textContent = error.message; throw error; }
+    });
+  });
+} else fetch("/api/health").then((r) => r.json()).then((h) => {
+  const m = $("#mode"); m.textContent = h.demo ? "演示模式" : "AI 已连接"; m.title = h.demo ? "未配置 API Key，使用规则演示" : "模型：" + h.model;
+  m.classList.toggle("demo", h.demo);
+  showDocuments(h);
 }).catch(() => { const m = $("#mode"); m.textContent = "服务未连接"; m.classList.add("off"); });
 
 /* ------------------------------------------------------------------ feedback */
@@ -123,7 +184,7 @@ function feedback(kind) {
       if (!rating) return toast("先点星星打个分吧");
       await busy(e.currentTarget, "提交中", async () => {
         await api("/api/feedback", { kind, rating, useful, comment: $("input", box).value });
-        box.innerHTML = `<span class="fb-done">${I("check")}谢谢反馈，它会帮助职途助手变得更准确</span>`;
+        box.innerHTML = `<span class="fb-done">${I("check")}${STATIC_MODE ? "反馈已保存到本机，可在本机记录页导出" : "谢谢反馈，它会帮助职途助手变得更准确"}</span>`;
       });
     });
   });

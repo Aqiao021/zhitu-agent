@@ -13,18 +13,20 @@
 <body>
 <header class="nav scrolled"><div class="nav-inner">
   <a class="brand" href="/"><svg class="brand-mark" viewBox="64 64 896 896" aria-hidden="true"><rect x="64" y="64" width="896" height="896" rx="152" fill="currentColor"/><path d="M224 764L368 620H464L592 468H680L800 328" fill="none" stroke="#fff" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/><circle cx="800" cy="328" r="50" fill="#FFC56B"/></svg><span class="brand-name">试用统计</span></a>
-  <div class="nav-right"><a id="csv" class="btn btn-primary btn-sm" href="/stats.csv">导出 CSV</a></div>
+  <div class="nav-right"><a class="btn btn-ghost btn-sm static-only" href="index.html">返回工具</a><a id="csv" class="btn btn-primary btn-sm" href="/stats.csv">导出 CSV</a></div>
 </div></header>
 <main class="container" style="padding-top:40px;padding-bottom:80px">
   <p class="eyebrow">Usage</p>
-  <h2>试用数据</h2>
-  <p class="muted">只统计接入真实模型后的使用（演示模式不计入）；不含任何简历或招聘信息内容。</p>
+  <h2 id="statsTitle">试用数据</h2>
+  <p class="muted" id="statsHelp">只统计接入真实模型后的使用（演示模式不计入）；不含任何简历或招聘信息内容。</p>
+  <div class="connection-notice records-notice static-only">这些是当前浏览器的记录，不是全站试用统计。换设备或清除浏览器数据后无法查看，请及时导出。<div class="model-actions"><button id="exportRaw" type="button" class="btn btn-ghost btn-sm">备份原始记录</button><button id="clearLocal" type="button" class="btn btn-ghost btn-sm">清除本机数据</button></div></div>
   <div id="err" class="need hidden"></div>
   <div class="kpis" id="kpis"></div>
   <div class="card"><h3>各功能使用情况</h3><div class="tbl"><table id="events"></table></div></div>
   <div class="card"><h3>用户评分</h3><div class="tbl"><table id="fb"></table></div></div>
   <div class="card"><h3>最近的文字反馈</h3><ul id="comments" class="clist"></ul></div>
 </main>
+<script src="browser-client.js"></script>
 <script src="stats.js"></script>
 </body>
 </html>

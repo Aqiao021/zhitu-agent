@@ -452,3 +452,26 @@ th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--line-2)
 th { font-size: 12px; letter-spacing: .1em; color: var(--muted); }
 .clist { list-style: none; padding: 0; margin: 0; } .clist li { padding: 10px 0; border-bottom: 1px solid var(--line-2); font-size: 14px; }
 @media (max-width: 767px) { .kpis { grid-template-columns: 1fr 1fr; } }
+
+/* Static edition: visitors supply their own credentials, never persisted. */
+html:not([data-mode="static"]) .static-only { display: none !important; }
+.connection-notice { margin: 20px 0 0; padding: 14px 18px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; background: #fff; font-size: 14px; }
+.connection-notice small { display: block; margin-top: 4px; color: var(--muted); line-height: 1.6; }
+.model-dialog { width: min(540px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 28px; border: 1px solid var(--line); border-radius: 16px; color: var(--ink); background: #fff; box-shadow: 0 24px 80px #0b1b3333; overflow-y: auto; }
+.model-dialog::backdrop { background: #0b1b3377; }
+.model-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.model-head h2 { font-size: 23px; margin: 0; }
+.model-dialog p { font-size: 14px; line-height: 1.7; }
+.model-dialog label { display: block; margin: 16px 0 6px; font-size: 14px; font-weight: 700; }
+.model-dialog input { display: block; width: 100%; min-width: 0; padding: 11px 12px; font: inherit; font-size: 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.model-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+.model-dialog #modelMessage { color: var(--muted); overflow-wrap: anywhere; }
+.records-notice { margin-bottom: 20px; }
+@media (max-width: 767px) {
+  html[data-mode="static"] .nav-cta { display: none; }
+  html[data-mode="static"] .nav-right { gap: 4px; }
+  html[data-mode="static"] .nav-right .btn { padding: 8px; font-size: 12px; }
+  .model-dialog { padding: 20px; }
+  .model-head h2 { font-size: 20px; }
+}
+@media print { .connection-notice, .model-dialog { display: none !important; } }
