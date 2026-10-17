@@ -3,6 +3,8 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const STATIC_MODE = document.documentElement.dataset.mode === 'static';
+let browserClient = null;
 document.documentElement.classList.add("js");
 
 /* ------------------------------------------------------------------ icons (24px stroke, round) */
@@ -32,38 +34,53 @@ const P = {
   bot: '<rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/>',
   alert: '<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5h.01"/>',
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',
+  briefcase: '<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8.5 7V5.5A1.5 1.5 0 0110 4h4a1.5 1.5 0 011.5 1.5V7M3 12.5h18"/>',
+  link: '<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',
+  layers: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+  award: '<circle cx="12" cy="9" r="5.5"/><path d="M8.5 13.5L7 21l5-2.5 5 2.5-1.5-7.5"/>',
+  chevL: '<path d="M15 6l-6 6 6 6"/>',
+  chevR: '<path d="M9 6l6 6-6 6"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/>',
+  plus: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
 };
 function icon(name) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ""}</svg>`;
 }
 function hydrateIcons(root = document) { $$("[data-icon]", root).forEach((el) => { if (!el.firstChild) el.innerHTML = icon(el.dataset.icon); }); }
 const I = (n) => `<span data-icon="${n}">${icon(n)}</span>`;
-const STATIC_MODE = document.documentElement.dataset.mode === "static";
-let browserClient = null;
 
 /* ------------------------------------------------------------------ utils */
 const store = {
   get(k, d) { try { const v = localStorage.getItem("zt_" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem("zt_" + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
 };
+/* visitor's own model key: sessionStorage by default, localStorage only if they tick "remember" */
+const KEY = {
+  get() { for (const st of ["sessionStorage", "localStorage"]) { try { const v = window[st].getItem("zt_key"); if (v) return JSON.parse(v); } catch (e) { /* unavailable */ } } return null; },
+  set(v, remember) { this.clear(); try { window[remember ? "localStorage" : "sessionStorage"].setItem("zt_key", JSON.stringify(v)); } catch (e) { toast("浏览器不允许保存，Key 只在本次页面有效", true); KEY.mem = v; } },
+  clear() { KEY.mem = null; for (const st of ["sessionStorage", "localStorage"]) { try { window[st].removeItem("zt_key"); } catch (e) { /* unavailable */ } } },
+  mem: null,
+};
+const userKey = () => STATIC_MODE ? KEY.mem : KEY.get() || KEY.mem;
+let H = { providers: [], allow_user_key: false, server_key: false };
 function session() { let s = store.get("session"); if (!s) { s = Math.random().toString(36).slice(2) + Date.now().toString(36); store.set("session", s); } return s; }
 function toast(msg, err = false) {
   const t = $("#toast"); t.textContent = msg; t.classList.toggle("err", err); t.classList.add("show");
   clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 4200);
 }
-async function api(path, body) {
+async function api(path, body, llm) {
   if (STATIC_MODE) {
     await browserReady;
-    if (!browserClient) throw new Error("页面资料加载失败，请刷新后重试");
-    if (browserClient.status === "disconnected" && path !== "/api/feedback") {
-      openModel();
-      throw new Error("请先连接模型，填写你自己的 API Key");
+    if (!browserClient) throw new Error('页面资料加载失败，请刷新重试');
+    if (path !== '/api/feedback' && browserClient.status === 'disconnected') {
+      keySheet(); throw new Error('请先连接模型，填写你自己的 API Key');
     }
     return browserClient.request(path, body);
   }
-  const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 150000);
+  const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 170000);
+  const k = llm || userKey();
   try {
-    const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, session: session() }), signal: ctrl.signal });
+    const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, session: session(), ...(k ? { llm: k } : {}) }), signal: ctrl.signal });
     const data = await r.json().catch(() => ({ error: "服务器返回格式不正确" }));
     if (!r.ok) throw new Error(data.error || `请求失败（${r.status}）`);
     return data;
@@ -79,10 +96,20 @@ function skeleton(msg) {
 }
 
 /* ------------------------------------------------------------------ state */
-const S = { diagnosis: store.get("diagnosis", null), plan: store.get("plan", null), done: store.get("done", {}), history: [], current: null, filter: "全部" };
+const S = { diagnosis: store.get("diagnosis", null), plan: store.get("plan", null), done: store.get("done", {}), history: [], current: null, filter: "全部",
+  job: store.get("job", null), mode: store.get("mode", "job"), major: "", selDay: null, majors: [] };
+async function getJSON(path) {
+  if (STATIC_MODE) {
+    await browserReady;
+    if (!browserClient) throw new Error('页面资料加载失败，请刷新重试');
+    return browserClient.get(path);
+  }
+  const r = await fetch(path); const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || `请求失败（${r.status}）`); return d;
+}
 
 /* ------------------------------------------------------------------ router */
-const TABS = ["diagnose", "plan", "interview", "ask"];
+const TABS = ["jobs", "diagnose", "plan", "interview", "ask"];
 function route() {
   const h = location.hash.replace(/^#/, "") || "/";
   const [path, query] = h.split("?");
@@ -92,11 +119,11 @@ function route() {
   $$(".nav-links a").forEach((a) => a.classList.toggle("active", a.dataset.route === view));
   document.body.classList.toggle("in-app", view === "app");
   if (view === "app") {
-    const tab = TABS.includes(parts[1]) ? parts[1] : "diagnose";
+    const tab = TABS.includes(parts[1]) ? parts[1] : "jobs";
     $$(".pane").forEach((p) => p.classList.toggle("active", p.id === "pane-" + tab));
     $$(".side-item").forEach((a) => a.classList.toggle("active", a.dataset.tab === tab));
     if (query && query.includes("sample=1") && !$("#resume").value) loadSample();
-    document.title = { diagnose: "差距诊断", plan: "补差计划", interview: "模拟面试", ask: "就业问答" }[tab] + " · 职途助手";
+    document.title = { jobs: "找岗位", diagnose: "差距诊断", plan: "30 天计划", interview: "模拟面试", ask: "就业问答" }[tab] + " · 职途助手";
   } else {
     document.title = "职途助手 · 求职差距诊断";
   }
@@ -115,62 +142,21 @@ function setupReveal() {
 }
 
 /* ------------------------------------------------------------------ health */
-function showDocuments(h) {
+function updateMode() {
+  if (STATIC_MODE) return updateBrowserMode();
+  const m = $("#mode"), k = userKey();
+  const pname = k && (H.providers.find((p) => p.id === k.provider) || {}).name;
+  $(".mode-text", m).textContent = k ? `我的 Key · ${pname || "已设置"}` : H.server_key ? `模型：${H.model}` : "演示模式";
+  m.title = k ? `使用你自己的 Key（模型：${k.model}），点击修改` : H.server_key ? "模型：" + H.model + (H.allow_user_key ? "，点击可改用自己的 Key" : "") : "未配置模型，点击填写自己的 API Key";
+  m.classList.toggle("demo", !k && !H.server_key); m.classList.toggle("user", !!k);
+  $("#keyHint").classList.toggle("hidden", !!k || H.server_key || !H.allow_user_key);
+}
+const browserReady = STATIC_MODE ? loadBrowserEdition() : Promise.resolve();
+if (!STATIC_MODE) fetch("/api/health").then((r) => r.json()).then((h) => {
+  H = h; updateMode();
   $("#docCount").textContent = h.documents.length;
   $("#docList").innerHTML = h.documents.map((d) => `<li>${esc(d.title)}（${esc(d.source)}${d.date ? "，" + esc(d.date) : ""}）${d.url ? ` <a href="${esc(d.url)}" target="_blank" rel="noopener">原文</a>` : ""}</li>`).join("");
-}
-function openModel() { $("#modelDialog").showModal(); $("#modelKey").focus(); }
-function showConnection(status) {
-  const text = { disconnected: "待连接模型", configured: "尚未验证", connected: "AI 已连接" }[status];
-  $("#mode").textContent = text;
-  $("#mode").classList.toggle("off", status !== "connected");
-  $("#connectionHint").textContent = status === "connected" ? "AI 已连接。密钥仅在当前页面内存中使用，刷新或关闭后清除。" : status === "configured" ? "密钥已填写，但尚未通过连接验证。请检查设置后重试。" : "请先连接你自己的模型密钥。密钥仅在当前页面内存中使用，刷新后清除。";
-  $("#mode").title = $("#connectionHint").textContent;
-}
-const browserReady = STATIC_MODE ? (async () => {
-  showConnection("disconnected");
-  $("#kbDescription").textContent = "资料检索、引用核验和评分在你的浏览器中完成。就业问答只把检索到的公开资料片段交给你选择的模型，并删除不存在的引用编号。每份资料都列出发布单位、日期和原文链接。";
-  $("#privacyDescription").textContent = "手机号、身份证号、邮箱、QQ/微信号、住址在发送前被遮盖，再直接发给你选择的模型服务商。API Key 只在当前页面内存中保留，不写入浏览器存储。诊断结果（含已遮盖的引用）、计划、进度和使用记录保存在本机浏览器，可在“本机记录”页导出或清除；清除浏览器数据后无法恢复。不同设备、不同浏览器之间不自动同步。";
-  try {
-    const response = await fetch("model-data.json", { cache: "no-cache" });
-    if (!response.ok) throw new Error("资料库加载失败");
-    const data = await response.json();
-    browserClient = new ZhituBrowser.Client({ data, onStatus: showConnection, onStorageError: message => toast(message, true) });
-    showDocuments(data);
-    $("#saveModel").disabled = false;
-  } catch (_) {
-    $("#mode").textContent = "资料加载失败";
-    $("#connectionHint").textContent = "页面资料加载失败，请检查网络后刷新。";
-    $("#modelMessage").textContent = "页面资料加载失败，请检查网络后刷新。";
-  }
-})() : Promise.resolve();
-if (STATIC_MODE) {
-  $("#btnConnect").addEventListener("click", openModel);
-  $("#closeModel").addEventListener("click", () => { $("#modelKey").value = ""; $("#modelDialog").close(); });
-  $("#modelDialog").addEventListener("close", () => { $("#modelKey").value = ""; });
-  $("#disconnectModel").addEventListener("click", () => { browserClient?.disconnect(); $("#modelKey").value = ""; $("#modelMessage").textContent = "当前页面的密钥已清除。"; });
-  window.addEventListener("pagehide", () => { browserClient?.disconnect(); $("#modelKey").value = ""; });
-  $("#modelForm").addEventListener("submit", async e => {
-    e.preventDefault();
-    await browserReady;
-    if (!browserClient) return;
-    await busy($("#saveModel"), "验证中", async () => {
-      browserClient.configure({ key: $("#modelKey").value, baseURL: $("#modelBase").value, model: $("#modelName").value });
-      $("#modelKey").value = "";
-      $("#modelMessage").textContent = "正在验证连接…";
-      try {
-        await browserClient.request("/api/test");
-        $("#modelMessage").textContent = "连接成功。";
-        $("#modelDialog").close();
-        toast("AI 已连接，可以开始诊断了");
-      } catch (error) { $("#modelMessage").textContent = error.message; throw error; }
-    });
-  });
-} else fetch("/api/health").then((r) => r.json()).then((h) => {
-  const m = $("#mode"); m.textContent = h.demo ? "演示模式" : "AI 已连接"; m.title = h.demo ? "未配置 API Key，使用规则演示" : "模型：" + h.model;
-  m.classList.toggle("demo", h.demo);
-  showDocuments(h);
-}).catch(() => { const m = $("#mode"); m.textContent = "服务未连接"; m.classList.add("off"); });
+}).catch(() => { const m = $("#mode"); $(".mode-text", m).textContent = "服务未连接"; m.classList.add("off"); });
 
 /* ------------------------------------------------------------------ feedback */
 function feedback(kind) {
@@ -184,7 +170,7 @@ function feedback(kind) {
       if (!rating) return toast("先点星星打个分吧");
       await busy(e.currentTarget, "提交中", async () => {
         await api("/api/feedback", { kind, rating, useful, comment: $("input", box).value });
-        box.innerHTML = `<span class="fb-done">${I("check")}${STATIC_MODE ? "反馈已保存到本机，可在本机记录页导出" : "谢谢反馈，它会帮助职途助手变得更准确"}</span>`;
+        box.innerHTML = `<span class="fb-done">${I("check")}谢谢反馈，它会帮助职途助手变得更准确</span>`;
       });
     });
   });
@@ -194,6 +180,171 @@ function feedback(kind) {
     <input placeholder="哪里不准或可以改进（可选）" maxlength="200" aria-label="反馈内容">
     <button type="button" class="btn btn-ghost btn-sm fb-send">提交</button></div>`;
 }
+
+/* ------------------------------------------------------------------ sheet (job detail / forms) */
+function openSheet(html) {
+  $("#sheetBody").innerHTML = html; hydrateIcons($("#sheetBody"));
+  $("#sheet").classList.remove("hidden"); document.body.classList.add("no-scroll");
+  requestAnimationFrame(() => $("#sheet").classList.add("open"));
+  const f = $("#sheetBody").querySelector("button, input, textarea, a"); if (f) f.focus({ preventScroll: true });
+}
+function closeSheet() {
+  const keyField = $('#kKey'); if (keyField) keyField.value = '';
+  $("#sheet").classList.remove("open"); document.body.classList.remove("no-scroll");
+  setTimeout(() => $("#sheet").classList.add("hidden"), 200);
+}
+$("#sheet").addEventListener("click", (e) => { if (e.target.closest("[data-close]")) closeSheet(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#sheet").classList.contains("hidden")) closeSheet(); });
+
+/* ------------------------------------------------------------------ own API key */
+function keySheet() {
+  if (STATIC_MODE) return browserKeySheet();
+  if (!H.allow_user_key) {
+    return openSheet(`<p class="eyebrow">模型设置</p><h3 class="sheet-title">当前模型</h3><p>${H.server_key ? `本站已接入模型：${esc(H.model)}，直接使用即可。` : "本站目前是演示模式，管理员没有开放填写自己的 API Key。"}</p>`);
+  }
+  const k = userKey() || {};
+  const cur = H.providers.find((p) => p.id === k.provider) || H.providers[0];
+  openSheet(`
+    <p class="eyebrow">模型设置</p>
+    <h3 class="sheet-title">使用自己的 API Key</h3>
+    <p class="muted small">${H.server_key ? `本站已接入模型（${esc(H.model)}），不填也能用；填写后会改用你自己的账户。` : "本站没有内置模型，填写你自己的大模型 API Key 后即可获得真实的 AI 分析。"}</p>
+    <label class="lbl" for="kProv">模型服务商</label>
+    <select class="input" id="kProv">${H.providers.map((p) => `<option value="${esc(p.id)}" ${p.id === cur.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select>
+    <label class="lbl" for="kModel">模型名</label>
+    <input class="input" id="kModel" maxlength="80" autocomplete="off" spellcheck="false" value="${esc(k.model || cur.model)}" placeholder="以服务商文档为准">
+    <p class="muted small" id="kModelHint"></p>
+    <label class="lbl" for="kKey">API Key</label>
+    <input class="input" id="kKey" type="password" maxlength="200" autocomplete="off" spellcheck="false" value="${esc(k.api_key || "")}" placeholder="sk-…">
+    <label class="check"><input type="checkbox" id="kRemember" ${KEY.get() && (() => { try { return !!localStorage.getItem("zt_key"); } catch (e) { return false; } })() ? "checked" : ""}>在这台设备上记住（公共电脑请不要勾选）</label>
+    <div class="notice">${I("lock")}<span>Key 默认只保存在当前标签页，关闭后清除。每次使用时随请求发到职途助手服务器，只用来调用你选的服务商，服务器不保存、不记录。费用由你的账户承担，建议在服务商后台设置额度上限。</span></div>
+    <div class="notice">${I("bulb")}<span>还没有 Key？到所选服务商的开放平台注册，在“API Key”页面创建一个；新用户通常有免费额度，具体以服务商说明为准。</span></div>
+    <div class="sheet-actions key-actions">
+      <button class="btn btn-ghost" type="button" id="kTest">测试连接</button>
+      <button class="btn btn-primary" type="button" id="kSave">保存并使用</button>
+      ${userKey() ? `<button class="btn btn-ghost" type="button" id="kClear">清除 Key</button>` : ""}
+    </div>`);
+  const hint = () => { const p = H.providers.find((x) => x.id === $("#kProv").value); $("#kModelHint").textContent = p.model ? `默认 ${p.model}，可改为服务商文档里的其他模型名` : "请填写服务商控制台或文档里的模型名（例如火山方舟填模型 ID）"; };
+  hint();
+  $("#kProv").addEventListener("change", () => { const p = H.providers.find((x) => x.id === $("#kProv").value); $("#kModel").value = p.model; hint(); });
+  const read = () => {
+    const v = { provider: $("#kProv").value, model: $("#kModel").value.trim(), api_key: $("#kKey").value.trim() };
+    if (v.api_key.length < 8) { toast("请粘贴完整的 API Key", true); return null; }
+    if (!v.model) { toast("请填写模型名", true); return null; }
+    return v;
+  };
+  $("#kTest").addEventListener("click", (e) => { const v = read(); if (!v) return; busy(e.currentTarget, "测试中", async () => { const r = await api("/api/key/test", {}, v); toast(`连接成功：${r.model}`); }); });
+  $("#kSave").addEventListener("click", () => { const v = read(); if (!v) return; KEY.set(v, $("#kRemember").checked); updateMode(); closeSheet(); toast("已保存，接下来的诊断和计划会使用你的 Key"); });
+  const c = $("#kClear"); if (c) c.addEventListener("click", () => { KEY.clear(); updateMode(); closeSheet(); toast("已清除你的 Key"); });
+}
+
+/* ------------------------------------------------------------------ job library */
+const KIND = { "画像": ["岗位画像", "tag-profile"], "导入": ["真实招聘", "tag-real"] };
+const kindTag = (k) => { const [t, c] = KIND[k] || KIND["画像"]; return `<span class="tag ${c}">${t}</span>`; };
+function renderMajors() {
+  $("#majorChips").innerHTML = [{ name: "", label: "全部专业" }, ...S.majors.map((m) => ({ name: m.name, label: m.name, count: m.count }))]
+    .map((m) => `<button type="button" class="major ${S.major === m.name ? "on" : ""}" data-major="${esc(m.name)}">${esc(m.label)}${m.count != null ? `<small>${m.count}</small>` : ""}</button>`).join("");
+  $$("#majorChips .major").forEach((b) => b.addEventListener("click", () => { S.major = b.dataset.major; renderMajors(); searchJobs(); }));
+}
+async function loadMajors() {
+  try {
+    const d = await getJSON("/api/majors");
+    S.majors = d.majors; renderMajors();
+    $("#homeMajors").innerHTML = `<table class="spec majors"><thead><tr><th>专业名称</th><th>专业代码</th><th class="hide-sm">专业大类 / 专业类</th><th>岗位数</th><th></th></tr></thead><tbody>${d.majors.map((m) =>
+      `<tr><td><b>${esc(m.name)}</b></td><td class="num">${esc(m.code)}</td><td class="hide-sm muted">${esc(m.category)}</td><td class="num">${m.count}</td><td class="right"><a class="linkish" href="#/app/jobs" data-major-go="${esc(m.name)}">查看岗位</a></td></tr>`).join("")}</tbody></table>`;
+    $$("[data-major-go]").forEach((a) => a.addEventListener("click", () => { S.major = a.dataset.majorGo; renderMajors(); searchJobs(); }));
+    $("#majorCount").textContent = d.majors.length; $("#jobCount").textContent = d.total_jobs;
+    $("#jobNotice").innerHTML = `${I("alert")}<span>${esc(d.notice)}（更新于 ${esc(d.updated)}）</span>`;
+    searchJobs();
+  } catch (e) { $("#jobResults").innerHTML = `<p class="muted">岗位库加载失败：${esc(e.message)}</p>`; }
+}
+let searchSeq = 0;
+async function searchJobs() {
+  const q = $("#jobQ").value.trim(), seq = ++searchSeq;
+  try {
+    const d = await getJSON(`/api/jobs?q=${encodeURIComponent(q)}&major=${encodeURIComponent(S.major)}`);
+    if (seq !== searchSeq) return;
+    const major = S.majors.find((m) => m.name === S.major);
+    $("#jobMeta").innerHTML = `${S.major ? `<b>${esc(S.major)}</b>${major?.code ? `（专业代码 ${esc(major.code)}）` : ""} · ` : ""}${q ? `“${esc(q)}” · ` : ""}找到 <b>${d.results.length}</b> 个岗位`;
+    $("#jobResults").innerHTML = d.results.map((j) => `
+      <button type="button" class="job-card ${S.job?.id === j.id ? "picked" : ""}" data-id="${esc(j.id)}">
+        <span class="jc-top"><b>${esc(j.title)}</b>${kindTag(j.kind)}</span>
+        <span class="jc-sum">${esc(j.summary)}</span>
+        <span class="jc-majors">${j.majors.map((m) => `<i>${esc(m)}</i>`).join("")}</span>
+        <span class="jc-tools">${j.tools.map((t) => `<em>${esc(t)}</em>`).join("")}</span>
+        <span class="jc-foot"><span>必需 ${j.must} 条 · 共 ${j.total} 条要求</span><span class="jc-go">查看要求${I("arrow")}</span></span>
+      </button>`).join("") || `<div class="need">${I("search")}<p>没有找到相关岗位，换个关键词试试，或者切换到“粘贴招聘”直接诊断。</p></div>`;
+    $$("#jobResults .job-card").forEach((b) => b.addEventListener("click", () => openJob(b.dataset.id)));
+  } catch (e) { if (seq === searchSeq) toast(e.message, true); }
+}
+$("#jobForm").addEventListener("submit", (e) => { e.preventDefault(); searchJobs(); });
+$("#jobQ").addEventListener("input", () => { clearTimeout(searchJobs.t); searchJobs.t = setTimeout(searchJobs, 300); });
+
+function reqList(reqs) {
+  return reqs.map((r) => `<li><span class="lvl ${r.level === "必需" ? "lvl-must" : "lvl-plus"}">${esc(r.level)}</span><span>${esc(r.item)}<small>${esc(r.category)}</small></span></li>`).join("");
+}
+async function openJob(id) {
+  let j;
+  try { j = await getJSON("/api/jobs/" + encodeURIComponent(id)); } catch (e) { return toast(e.message, true); }
+  const must = j.requirements.filter((r) => r.level === "必需"), plus = j.requirements.filter((r) => r.level !== "必需");
+  openSheet(`
+    <p class="eyebrow">${j.kind === "导入" ? "同学提交的真实招聘" : "岗位画像"}</p>
+    <h3 class="sheet-title">${esc(j.title)} ${kindTag(j.kind)}</h3>
+    ${j.aliases.length ? `<p class="muted small">也叫：${j.aliases.map(esc).join("、")}</p>` : ""}
+    <p>${esc(j.summary)}</p>
+    <div class="jc-majors">${j.majors.map((m) => `<i>${esc(m)}</i>`).join("")}${j.city ? `<i>${esc(j.city)}</i>` : ""}${j.education ? `<i>${esc(j.education)}</i>` : ""}</div>
+    ${j.duties.length ? `<h4>${I("briefcase")}主要工作</h4><ul class="plain">${j.duties.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    <h4>${I("check")}必需要求 ${must.length} 条</h4><ul class="reqs">${reqList(must)}</ul>
+    ${plus.length ? `<h4>${I("plus")}加分要求 ${plus.length} 条</h4><ul class="reqs">${reqList(plus)}</ul>` : ""}
+    ${j.tools.length ? `<h4>${I("layers")}要会的软件 / 工具</h4><div class="jc-tools">${j.tools.map((t) => `<em>${esc(t)}</em>`).join("")}</div>` : ""}
+    ${j.certificates.length ? `<h4>${I("award")}可考的证书（加分项）</h4><ul class="plain">${j.certificates.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    <h4>${I("link")}来源</h4><ul class="plain src">${j.sources.map((x) => `<li>${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a>` : esc(x.title)}${x.date ? ` · ${esc(x.date)}` : ""}</li>`).join("")}</ul>
+    <p class="notice">${I("alert")}<span>${j.kind === "导入" ? "这是同学提交、经整理的真实招聘信息，已隐去公司和联系方式；投递前请到招聘平台核实。" : "岗位画像根据公开资料归纳，不代表某家公司的真实招聘；部分来源要求本科，只用于归纳技能要求。"}</span></p>
+    <div class="sheet-actions"><button class="btn btn-primary" type="button" id="btnPickJob">用这个岗位诊断我的简历 ${I("arrow")}</button></div>`);
+  $("#btnPickJob").addEventListener("click", () => { pickJob(j); closeSheet(); location.hash = "#/app/diagnose"; });
+}
+function pickJob(j) {
+  S.job = { id: j.id, title: j.title, kind: j.kind, majors: j.majors, must: j.requirements.filter((r) => r.level === "必需").length, total: j.requirements.length, tools: j.tools.slice(0, 6) };
+  S.mode = "job"; store.set("job", S.job); store.set("mode", "job");
+  renderTarget(); syncSteps(); toast(`已选择目标岗位：${j.title}`);
+}
+
+function contribute(prefill = "") {
+  if (STATIC_MODE) return toast('公共岗位库由维护者更新；你可以在「粘贴招聘」中诊断自己的招聘信息。');
+  openSheet(`
+    <p class="eyebrow">一起把岗位库变真实</p>
+    <h3 class="sheet-title">贡献一条真实招聘</h3>
+    <p class="muted small">把在招聘平台、学校就业网或招聘会上看到的岗位信息贴进来。提交时会自动隐藏手机号、邮箱等信息；管理员整理审核后会以“真实招聘”标签入库，供其他同学诊断使用。</p>
+    <div class="field"><textarea id="cText" placeholder="岗位名称、岗位职责、任职要求……（请删掉联系人、电话等信息）" style="min-height:220px">${esc(prefill)}</textarea></div>
+    <label class="lbl" for="cUrl">原链接（可选）</label><input class="input" id="cUrl" placeholder="https://" maxlength="300">
+    <label class="lbl" for="cNote">备注（可选）</label><input class="input" id="cNote" placeholder="例如：2026 秋招 · 厦门 · 大专可投" maxlength="100">
+    <div class="sheet-actions"><button class="btn btn-primary" type="button" id="btnSubmitJob">提交审核 ${I("send")}</button></div>`);
+  $("#btnSubmitJob").addEventListener("click", (e) => {
+    const text = $("#cText").value.trim(); if (text.length < 40) return toast("招聘信息至少 40 字", true);
+    busy(e.currentTarget, "提交中", async () => {
+      await api("/api/jobs/submit", { text, url: $("#cUrl").value.trim(), note: $("#cNote").value.trim() });
+      closeSheet(); toast("提交成功，谢谢你！审核后会出现在岗位库里");
+    });
+  });
+}
+$("#btnContribute").addEventListener("click", () => contribute());
+
+/* diagnose target: job library or pasted posting */
+function renderTarget() {
+  $$("#targetSeg button").forEach((b) => b.classList.toggle("on", b.dataset.m === S.mode));
+  $("#targetJob").classList.toggle("hidden", S.mode !== "job"); $("#targetPaste").classList.toggle("hidden", S.mode !== "paste");
+  const j = S.job;
+  $("#targetJob").innerHTML = j ? `
+    <div class="picked-job"><div class="pj-top"><b>${esc(j.title)}</b>${kindTag(j.kind)}</div>
+      <div class="jc-majors">${(j.majors || []).map((m) => `<i>${esc(m)}</i>`).join("")}</div>
+      <p class="muted small">必需 ${j.must} 条 · 共 ${j.total} 条要求，将逐条对照你的简历</p>
+      <div class="jc-tools">${(j.tools || []).map((t) => `<em>${esc(t)}</em>`).join("")}</div>
+      <div class="pj-actions"><button type="button" class="btn btn-ghost btn-sm" id="btnViewJob">${I("file")}查看要求</button><a class="btn btn-ghost btn-sm" href="#/app/jobs">${I("refresh")}更换岗位</a></div></div>`
+    : `<div class="need small-need">${I("briefcase")}<p>还没有选择目标岗位</p><a class="btn btn-primary btn-sm" href="#/app/jobs">去岗位库选择</a><button type="button" class="linkish" data-m2="paste">或者粘贴一条招聘信息</button></div>`;
+  const v = $("#btnViewJob"); if (v) v.addEventListener("click", () => openJob(j.id));
+  const p = $("#targetJob [data-m2]"); if (p) p.addEventListener("click", () => setMode("paste"));
+}
+function setMode(m) { S.mode = m; store.set("mode", m); renderTarget(); }
+$$("#targetSeg button").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.m)));
 
 /* ------------------------------------------------------------------ diagnose */
 const SAMPLE_RESUME = `【示例简历 · 人物为虚构】
@@ -215,7 +366,11 @@ const SAMPLE_JD = `【示例岗位】AI 应用开发实习生
 3. 熟悉 Git，有项目经验者优先；
 4. 具备良好的沟通能力和团队协作意识；
 5. 大专及以上学历，计算机相关专业。`;
-function loadSample() { $("#resume").value = SAMPLE_RESUME; $("#jd").value = SAMPLE_JD; count(); toast("已载入示例（虚构人物与岗位）"); }
+async function loadSample() {
+  $("#resume").value = SAMPLE_RESUME; $("#jd").value = SAMPLE_JD; count();
+  if (S.mode === "job" && !S.job) { try { pickJob(await getJSON("/api/jobs/ai_app_dev_assistant")); } catch (e) { setMode("paste"); } }
+  toast("已载入示例简历（虚构人物）");
+}
 function count() { $("#cResume").textContent = $("#resume").value.trim().length + " 字"; $("#cJd").textContent = $("#jd").value.trim().length + " 字"; }
 $("#resume").addEventListener("input", count); $("#jd").addEventListener("input", count);
 $("#btnSample").addEventListener("click", loadSample);
@@ -228,12 +383,14 @@ $("#resumeFile").addEventListener("change", (e) => {
 $("#btnDiagnose").addEventListener("click", (e) => {
   const resume = $("#resume").value.trim(), jd = $("#jd").value.trim();
   if (resume.length < 30) return toast("简历内容至少 30 字", true);
-  if (jd.length < 20) return toast("招聘信息至少 20 字", true);
+  if (S.mode === "job" && !S.job) return toast("请先从岗位库选择目标岗位，或切换到“粘贴招聘”", true);
+  if (S.mode === "paste" && jd.length < 20) return toast("招聘信息至少 20 字", true);
+  const body = S.mode === "job" ? { resume, job_id: S.job.id } : { resume, jd };
   $("#diagResult").innerHTML = skeleton("正在逐条对照岗位要求，通常需要 10～40 秒…");
   $("#diagResult").scrollIntoView({ behavior: "smooth", block: "start" });
   busy(e.currentTarget, "诊断中", async () => {
-    const d = await api("/api/diagnose", { resume, jd });
-    S.diagnosis = d; S.plan = null; S.done = {}; S.filter = "全部";
+    const d = await api("/api/diagnose", body);
+    S.diagnosis = d; S.plan = null; S.done = {}; S.filter = "全部"; S.selDay = null;
     store.set("diagnosis", d); store.set("plan", null); store.set("done", {});
     renderDiagnosis(); syncSteps();
   }).then(() => { if ($("#diagResult .skeleton")) { if (S.diagnosis) renderDiagnosis(); else $("#diagResult").innerHTML = ""; } });
@@ -246,77 +403,139 @@ function renderDiagnosis() {
   const n = d.requirements.length, c = d.counts;
   const hidden = Object.entries(d.privacy || {}).map(([k, v]) => `${k} ${v} 处`).join("、");
   const list = d.requirements.filter((r) => S.filter === "全部" || r.status === S.filter);
+  const so = d.source || {};
+  const src = so.type === "job" ? `<p class="src-line">${I("briefcase")}岗位要求来自岗位库（${so.kind === "导入" ? "同学提交的真实招聘" : "岗位画像"}）${(so.sources || []).slice(0, 2).map((x) => x.url ? ` · <a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title.slice(0, 22))}…</a>` : "").join("")} · <button type="button" class="linkish" id="btnSrcJob">查看全部要求</button></p>`
+    : so.type === "paste" ? `<p class="src-line">${I("file")}岗位要求从你粘贴的招聘信息中拆解 · <button type="button" class="linkish server-only" id="btnShare">把这条招聘贡献到岗位库</button></p>` : "";
+  const lv = (r) => r.level ? `<span class="lvl ${r.level === "必需" ? "lvl-must" : "lvl-plus"}">${esc(r.level)}</span>` : "—";
   $("#diagResult").innerHTML = `
-  <div class="card">
-    <div class="report-head">
-      <div class="gauge"><svg viewBox="0 0 136 136"><circle class="trk" cx="68" cy="68" r="58"/><circle class="val" cx="68" cy="68" r="58" stroke="${color}" style="stroke-dasharray:364.4;stroke-dashoffset:364.4"/></svg><div><b>${s}</b><small>匹配度</small></div></div>
-      <div>
+  <div class="card report">
+    <div class="report-top">
+      <div class="report-main">
         <p class="eyebrow">诊断报告${d.demo ? " · 演示模式" : ""}</p>
-        <h3 class="report-title">${esc(d.job_title)}</h3>
-        <div class="muted">${esc(d.summary)}</div>
-        <div class="stack" aria-hidden="true"><i style="width:${c["具备"] / n * 100}%;background:var(--have)"></i><i style="width:${c["部分具备"] / n * 100}%;background:#E19A2C"></i><i style="width:${c["缺少"] / n * 100}%;background:var(--miss)"></i></div>
-        <div class="legend"><span>具备 <b>${c["具备"]}</b></span><span>部分具备 <b>${c["部分具备"]}</b></span><span>缺少 <b>${c["缺少"]}</b></span><span>共 <b>${n}</b> 条要求</span></div>
-        <p class="method">匹配度 = 具备 1 分、部分具备 0.5 分、缺少 0 分的平均值，由程序计算${hidden ? `；已自动隐藏 ${esc(hidden)}` : ""}${d.unverified_evidence ? `；${d.unverified_evidence} 条模型依据在简历中找不到原文，已降级` : ""}</p>
+        <h2 class="report-title">${esc(d.job_title)}</h2>
+        <p class="muted">${esc(d.summary)}</p>
+        ${src}
       </div>
-      <div class="report-actions"><button class="btn btn-ghost btn-sm" type="button" data-action="print">${I("printer")}打印报告</button></div>
+      <div class="report-actions"><button class="btn btn-default btn-sm" type="button" data-action="print">${I("printer")}打印报告</button></div>
     </div>
+    <div class="stat-row">
+      <div class="stat stat-score"><div class="gauge"><svg viewBox="0 0 136 136"><circle class="trk" cx="68" cy="68" r="58"/><circle class="val" cx="68" cy="68" r="58" stroke="${color}" style="stroke-dasharray:364.4;stroke-dashoffset:364.4"/></svg></div><div><span>匹配度</span><b class="num">${s}<small>/100</small></b></div></div>
+      <div class="stat"><span>具备</span><b class="num c-have">${c["具备"]}</b></div>
+      <div class="stat"><span>部分具备</span><b class="num c-part">${c["部分具备"]}</b></div>
+      <div class="stat"><span>缺少</span><b class="num c-miss">${c["缺少"]}</b></div>
+      <div class="stat"><span>必需项缺口</span><b class="num ${d.must_gaps ? "c-miss" : ""}">${d.must_gaps || 0}</b></div>
+    </div>
+    <div class="stack" aria-hidden="true"><i style="width:${c["具备"] / n * 100}%;background:var(--have)"></i><i style="width:${c["部分具备"] / n * 100}%;background:var(--part)"></i><i style="width:${c["缺少"] / n * 100}%;background:var(--miss)"></i></div>
+    <p class="method">${I("info")}匹配度按具备 1 分、部分具备 0.5 分、缺少 0 分计算，必需项权重 2、加分项权重 1，由程序计算${hidden ? `；已自动隐藏 ${esc(hidden)}` : ""}${d.unverified_evidence ? `；${d.unverified_evidence} 条模型依据在简历中找不到原文，已降级` : ""}</p>
   </div>
   <div class="report-grid">
-    <div class="card">
-      <h3>${I("file")}逐条对照</h3>
-      <div class="filters">${["全部", "缺少", "部分具备", "具备"].map((f) => `<button type="button" class="filter ${S.filter === f ? "on" : ""}" data-f="${f}">${f}${f === "全部" ? " " + n : " " + c[f]}</button>`).join("")}</div>
-      ${list.map((r) => { const [cls, pill, ic] = ST[r.status]; return `
-      <div class="req ${cls}"><span class="req-ic">${I(ic)}</span><div>
-        <div class="req-top"><b>${esc(r.item)}<span class="cat">${esc(r.category)}</span></b><span class="st ${pill}">${esc(r.status)}</span></div>
-        ${r.evidence ? `<div class="quote-box"><small>${I("check")}简历原文 · 已核验</small>${esc(r.evidence)}</div>` : ""}
-        ${r.note ? `<div class="note">${I("alert")}${esc(r.note)}</div>` : ""}
-        ${r.advice ? `<div class="advice">${I("bulb")}<span>${esc(r.advice)}</span></div>` : ""}
-      </div></div>`; }).join("") || `<p class="muted">这一类没有条目</p>`}
+    <div class="card table-card">
+      <div class="card-head"><h3>逐条对照 <small>${n} 条</small></h3>
+        <div class="filters">${["全部", "缺少", "部分具备", "具备"].map((f) => `<button type="button" class="filter ${S.filter === f ? "on" : ""}" data-f="${f}">${f} ${f === "全部" ? n : c[f]}</button>`).join("")}</div></div>
+      <div class="rtable" role="table" aria-label="岗位要求逐条对照">
+        <div class="rt-row rt-head" role="row"><span role="columnheader">状态</span><span role="columnheader">岗位要求</span><span role="columnheader">类别</span><span role="columnheader">重要度</span><span role="columnheader">依据与建议</span></div>
+        ${list.map((r) => { const [cls, pill] = ST[r.status]; return `
+        <div class="rt-row ${cls}" role="row">
+          <span role="cell"><span class="st ${pill}">${esc(r.status)}</span></span>
+          <span role="cell" class="rt-item">${esc(r.item)}</span>
+          <span role="cell" class="rt-cat">${esc(r.category)}</span>
+          <span role="cell">${lv(r)}</span>
+          <span role="cell" class="rt-ev">
+            ${r.evidence ? `<span class="quote-box"><small>${I("check")}简历原文 · 已核验</small>${esc(r.evidence)}</span>` : ""}
+            ${r.note ? `<span class="note">${I("alert")}${esc(r.note)}</span>` : ""}
+            ${r.advice ? `<span class="advice">${I("bulb")}<span>${esc(r.advice)}</span></span>` : ""}
+          </span>
+        </div>`; }).join("") || `<p class="muted pad">这一类没有条目</p>`}
+      </div>
     </div>
     <div>
-      ${d.strengths.length ? `<div class="card side-card"><h3>${I("sparkle")}你的优势</h3><ul>${d.strengths.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
+      ${d.strengths.length ? `<div class="card side-card"><h3>${I("check")}你的优势</h3><ul>${d.strengths.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
       ${d.honesty_notes.length ? `<div class="card side-card"><h3>${I("alert")}需要如实修改</h3><ul>${d.honesty_notes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
       <div class="card side-card"><h3>${I("book")}国家职业标准对应</h3><div class="muted" style="font-size:14px">${esc(d.standard_note || "本岗位没有匹配到具体的标准条目。")}</div>
         ${d.references.length ? `<div class="refs">${d.references.map((r, i) => `[${i + 1}] 《${esc(r.title)}》${esc(r.section)}${r.url ? ` · <a href="${esc(r.url)}" target="_blank" rel="noopener">来源</a>` : ""}`).join("<br>")}</div>` : ""}</div>
     </div>
   </div>
   <div class="next">
-    <a href="#/app/plan">${I("calendar")}<span><b>生成 4 周补差计划</b><small>按你的可用时间安排任务</small></span></a>
+    <a href="#/app/plan">${I("calendar")}<span><b>生成 30 天补差计划</b><small>每天做什么、要学会哪些软件</small></span></a>
     <a href="#/app/interview">${I("mic")}<span><b>针对短板模拟面试</b><small>5 道题 · 五维评分</small></span></a>
   </div>
   <div class="card" style="margin-top:24px">${feedback("diagnose")}<p class="meta">用时 ${(d.elapsed_ms / 1000).toFixed(1)} 秒</p></div>`;
   $$(".filter", $("#diagResult")).forEach((b) => b.addEventListener("click", () => { S.filter = b.dataset.f; renderDiagnosis(); }));
+  const sj = $("#btnSrcJob"); if (sj) sj.addEventListener("click", () => openJob(so.id));
+  const sh = $("#btnShare"); if (sh) sh.addEventListener("click", () => contribute($("#jd").value.trim()));
   requestAnimationFrame(() => requestAnimationFrame(() => { const v = $("#diagResult .gauge .val"); if (v) v.style.strokeDashoffset = 364.4 * (1 - s / 100); }));
 }
 
-/* ------------------------------------------------------------------ plan */
+/* ------------------------------------------------------------------ 30-day plan */
 $("#hours").addEventListener("input", (e) => { $("#hoursVal").textContent = e.target.value; });
 $("#btnPlan").addEventListener("click", (e) => {
-  $("#planResult").innerHTML = skeleton("正在按你的时间安排 4 周任务…");
+  $("#planResult").innerHTML = skeleton("AI 正在设计学习模块，程序随后排进 30 天日历，通常需要 20～60 秒…");
   busy(e.currentTarget, "规划中", async () => {
-    const p = await api("/api/plan", { diagnosis: S.diagnosis, weekly_hours: +$("#hours").value });
-    S.plan = p; S.done = {}; store.set("plan", p); store.set("done", {}); renderPlan(); syncSteps();
-  }).then(() => { if ($("#planResult .skeleton")) $("#planResult").innerHTML = ""; });
+    const p = await api("/api/plan", { diagnosis: S.diagnosis, daily_hours: +$("#hours").value });
+    S.plan = p; S.done = {}; S.selDay = null; store.set("plan", p); store.set("done", {}); renderPlan(); syncSteps();
+  }).then(() => { if ($("#planResult .skeleton")) { if (S.plan) renderPlan(); else $("#planResult").innerHTML = ""; } });
 });
+const DTYPE = { "学习": "t-learn", "复盘": "t-review", "项目": "t-project", "面试": "t-iv" };
+const fmtMin = (m) => (m >= 60 ? `${+(m / 60).toFixed(1)} 小时` : `${m} 分钟`);
+function dayRange(days) {
+  if (!days.length) return "未排入";
+  const out = []; let a = days[0], b = days[0];
+  for (const d of days.slice(1).concat([null])) { if (d === b + 1) { b = d; continue; } out.push(a === b ? `${a}` : `${a}–${b}`); a = b = d; }
+  return "第 " + out.join("、") + " 天";
+}
+function dayDone(day) { return day.tasks.length && day.tasks.every((t) => S.done[t.id]); }
+function taskRow(t) {
+  return `<label class="task ${S.done[t.id] ? "done" : ""}"><input type="checkbox" data-k="${esc(t.id)}" ${S.done[t.id] ? "checked" : ""}>
+    <span><span class="t">${esc(t.title)}</span><span class="c">完成标准：${esc(t.output)}</span>${t.tools?.length ? `<span class="tt">${t.tools.map((x) => `<em>${esc(x)}</em>`).join("")}</span>` : ""}</span>
+    <span class="h">${t.minutes} 分</span></label>`;
+}
 function renderPlan() {
-  const p = S.plan; if (!p) return;
-  const total = p.weeks.reduce((a, w) => a + w.tasks.length, 0);
-  const done = Object.values(S.done).filter(Boolean).length;
+  const p = S.plan; if (!p || !p.days) return;
+  const all = p.days.flatMap((d) => d.tasks), done = all.filter((t) => S.done[t.id]).length;
+  if (!S.selDay) S.selDay = (p.days.find((d) => !dayDone(d)) || p.days[0]).day;
+  const sel = p.days.find((d) => d.day === S.selDay) || p.days[0];
+  const doneDays = p.days.filter(dayDone).length;
   $("#planResult").innerHTML = `
   <div class="card">
     <div class="plan-summary">
-      <div><p class="eyebrow">${esc(S.diagnosis?.job_title || "")}${p.demo ? " · 演示模式" : ""}</p><h3 class="report-title" style="margin:0">4 周 · 每周不超过 ${p.weekly_hours} 小时</h3></div>
-      <div class="progress"><div class="progress-bar"><i style="width:${total ? done / total * 100 : 0}%"></i></div><small>已完成 ${done} / ${total} 项（进度只保存在这台设备上）</small></div>
+      <div><p class="eyebrow">${esc(p.job_title || S.diagnosis?.job_title || "")}${p.demo ? " · 演示模式" : ""}</p><h3 class="report-title" style="margin:0">30 天 · 每天不超过 ${fmtMin(p.daily_minutes)}</h3></div>
+      <div class="progress"><div class="progress-bar"><i style="width:${all.length ? done / all.length * 100 : 0}%"></i></div><small>已完成 ${done} / ${all.length} 项任务 · ${doneDays} 天全部完成（进度只保存在这台设备上）</small></div>
       <button class="btn btn-ghost btn-sm" type="button" data-action="print">${I("printer")}打印 / 存为 PDF</button>
     </div>
-    <div class="timeline">${p.weeks.map((w) => `
-      <div class="week"><span class="week-dot">${w.week}</span><div class="week-card">
-        <div class="week-head"><b>第 ${w.week} 周 · ${esc(w.goal)}</b><span>${w.hours} h</span></div>
-        ${w.tasks.map((t, i) => { const k = `${w.week}-${i}`; return `<label class="task ${S.done[k] ? "done" : ""}"><input type="checkbox" data-k="${k}" ${S.done[k] ? "checked" : ""}><span><span class="t">${esc(t.task)}</span><span class="c">验收：${esc(t.check)}</span></span><span class="h">${t.hours} h</span></label>`; }).join("")}
-      </div></div>`).join("")}</div>
-    ${p.tips.length ? `<h3 style="margin-top:8px">${I("bulb")}执行建议</h3><div class="tips">${p.tips.map((x) => `<div class="tip">${I("check")}<span>${esc(x)}</span></div>`).join("")}</div>` : ""}
+  </div>
+  <div class="card">
+    <h3>${I("layers")}这 30 天要学会的软件和技能</h3>
+    <div class="skill-grid">${p.skills.map((k) => `<div class="skill"><b>${esc(k.skill)}</b><small>${esc(dayRange(k.days))}</small>
+      ${k.gap ? `<p>对应差距：${esc(k.gap)}</p>` : ""}${k.tools.length ? `<div class="jc-tools">${k.tools.map((t) => `<em>${esc(t)}</em>`).join("")}</div>` : ""}</div>`).join("")}</div>
+    ${p.tools.length ? `<p class="tool-line"><b>软件 / 工具清单：</b>${p.tools.map(esc).join("、")}</p>` : ""}
+    <div class="plan-extra">
+      <div class="tip">${I("briefcase")}<span><b>综合项目（第 26、27、29 天）：${esc(p.project.title)}</b><br>${esc(p.project.desc)}<br><small>交付：${esc(p.project.output)}</small></span></div>
+      ${p.certificates.length ? `<div class="tip">${I("award")}<span><b>可以开始准备的证书（加分项，不承诺拿证）</b><br>${p.certificates.map(esc).join("<br>")}</span></div>` : ""}
+    </div>
+  </div>
+  <div class="card no-print">
+    <div class="cal-head"><h3>${I("calendar")}30 天日历</h3><div class="cal-legend"><span class="t-learn">学习</span><span class="t-review">复盘</span><span class="t-project">项目</span><span class="t-iv">面试</span></div></div>
+    <div class="cal" role="list">${p.days.map((d) => `<button type="button" role="listitem" class="day ${DTYPE[d.type] || ""} ${d.day === sel.day ? "sel" : ""} ${dayDone(d) ? "ok" : ""}" data-day="${d.day}" aria-label="第 ${d.day} 天 ${esc(d.theme)}">
+      <span class="dn">${d.day}</span>${dayDone(d) ? `<span class="dk">${icon("check")}</span>` : ""}<span class="dt">${esc(d.theme)}</span><span class="dm">${d.minutes} 分</span></button>`).join("")}</div>
+    <div class="day-detail">
+      <div class="dd-head"><button type="button" class="icon-btn" data-step="-1" aria-label="前一天" ${sel.day === 1 ? "disabled" : ""}>${icon("chevL")}</button>
+        <div><b>第 ${sel.day} 天 · ${esc(sel.type)}日</b><small>${esc(sel.theme)} · 共 ${sel.minutes} 分钟 · 第 ${sel.week} 周</small></div>
+        <button type="button" class="icon-btn" data-step="1" aria-label="后一天" ${sel.day === 30 ? "disabled" : ""}>${icon("chevR")}</button></div>
+      ${sel.tasks.map(taskRow).join("")}
+      ${sel.day === 30 ? `<div class="pj-actions"><a class="btn btn-primary btn-sm" href="#/app/diagnose">${I("refresh")}重新诊断</a><a class="btn btn-ghost btn-sm" href="#/app/interview">${I("mic")}模拟面试</a></div>` : ""}
+    </div>
+  </div>
+  <div class="card print-only">
+    <h3>30 天每日任务</h3>
+    ${p.days.map((d) => `<div class="pday"><b>第 ${d.day} 天 · ${esc(d.type)} · ${esc(d.theme)}（${d.minutes} 分钟）</b><ul>${d.tasks.map((t) => `<li>${S.done[t.id] ? "☑" : "☐"} ${esc(t.title)}（${t.minutes} 分）— 完成标准：${esc(t.output)}</li>`).join("")}</ul></div>`).join("")}
+  </div>
+  ${p.unscheduled?.length ? `<div class="card"><h3>${I("alert")}没排进 30 天的任务（${p.unscheduled.length} 项）</h3><p class="muted small">每天的时间有限，这些任务可以在第二个月继续，或把每天的时间调多一点重新生成。</p><ul class="plain">${p.unscheduled.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
+  <div class="card">
+    ${p.tips?.length ? `<h3>${I("bulb")}执行建议</h3><div class="tips">${p.tips.map((x) => `<div class="tip">${I("check")}<span>${esc(x)}</span></div>`).join("")}</div>` : ""}
     ${feedback("plan")}
   </div>`;
+  $$("#planResult .day").forEach((b) => b.addEventListener("click", () => { S.selDay = +b.dataset.day; renderPlan(); $("#planResult .day-detail").scrollIntoView({ behavior: "smooth", block: "nearest" }); }));
+  $$("#planResult [data-step]").forEach((b) => b.addEventListener("click", () => { S.selDay = Math.max(1, Math.min(30, sel.day + +b.dataset.step)); renderPlan(); }));
   $$("#planResult .task input").forEach((cb) => cb.addEventListener("change", () => { S.done[cb.dataset.k] = cb.checked; store.set("done", S.done); renderPlan(); }));
 }
 
@@ -397,7 +616,9 @@ $("#askForm").addEventListener("submit", (e) => {
 /* ------------------------------------------------------------------ step status */
 function syncSteps() {
   const has = !!S.diagnosis;
-  $("#st-diagnose").textContent = has ? `已完成 · 匹配度 ${S.diagnosis.match_score}` : "第一步";
+  $("#st-jobs").textContent = S.job ? `已选：${S.job.title.length > 11 ? S.job.title.slice(0, 11) + "…" : S.job.title}` : "第一步";
+  $("#st-jobs").classList.toggle("done", !!S.job);
+  $("#st-diagnose").textContent = has ? `已完成 · 匹配度 ${S.diagnosis.match_score}` : S.job || S.mode === "paste" ? "可以开始" : "选好岗位后";
   $("#st-diagnose").classList.toggle("done", has);
   $("#st-plan").textContent = S.plan ? "已生成" : has ? "可以开始" : "需先诊断";
   $("#st-plan").classList.toggle("done", !!S.plan);
@@ -408,10 +629,17 @@ function syncSteps() {
   ivProgress();
 }
 
-document.addEventListener("click", (e) => { if (e.target.closest("[data-action=print]")) window.print(); });
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-action=print]")) window.print();
+  if (e.target.closest("[data-action=key]")) keySheet();
+});
 
 /* ------------------------------------------------------------------ boot */
-hydrateIcons(); count(); syncSteps();
+if (S.plan && !S.plan.days) {
+  store.set('legacy_plan', { plan: S.plan, done: S.done });
+  S.plan = null; S.done = {}; store.set('plan', null); store.set('done', {});
+}   // drop plans saved by the old 4-week version
+hydrateIcons(); count(); renderTarget(); syncSteps(); loadMajors();
 if (S.diagnosis) renderDiagnosis();
 if (S.plan) renderPlan();
 route(); setupReveal();

@@ -1,5 +1,5 @@
 "use strict";
-const NAMES = { diagnose: "差距诊断", plan: "补差计划", interview: "模拟面试", ask: "就业问答" };
+const NAMES = { diagnose: "差距诊断", plan: "30 天计划", interview: "模拟面试", ask: "就业问答" };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const q = location.search;
 const STATIC_MODE = document.documentElement.dataset.mode === "static";
@@ -21,7 +21,7 @@ async function loadStats() {
     document.getElementById("exportRaw").addEventListener("click", () => { try { download("zhitu-local-records.json", localStorage.getItem("zt_local_records_v1") || "[]", "application/json"); } catch (error) { showError(error); } });
     document.getElementById("clearLocal").addEventListener("click", () => {
       if (!confirm("将清除当前浏览器的诊断结果、计划、进度和使用记录。请先导出备份。确定清除？")) return;
-      try { for (const key of ["zt_diagnosis", "zt_plan", "zt_done", "zt_session", "zt_local_records_v1"]) localStorage.removeItem(key); location.reload(); } catch (error) { showError(error); }
+      try { for (const key of ["zt_diagnosis", "zt_plan", "zt_done", "zt_session", "zt_job", "zt_mode", "zt_legacy_plan", "zt_local_records_v1"]) localStorage.removeItem(key); location.reload(); } catch (error) { showError(error); }
     });
     return records.stats();
   }
@@ -44,3 +44,42 @@ loadStats().then((d) => {
     (Object.entries(d.feedback).map(([k, e]) => `<tr><td>${NAMES[k] || esc(k)}</td><td>${e.count}</td><td>${e.avg_rating}</td><td>${e.useful_rate == null ? "—" : (e.useful_rate * 100).toFixed(0) + "%"}</td></tr>`).join("") || "<tr><td colspan=4>暂无数据</td></tr>");
   document.getElementById("comments").innerHTML = d.comments.map((c) => `<li><span class="st st-have">${NAMES[c.kind] || esc(c.kind)} · ${c.rating}★</span> ${esc(c.comment)}</li>`).join("") || "<li class='muted'>暂无</li>";
 }).catch(showError);
+
+if (!STATIC_MODE) {
+/* ------------------------------------------------------------ job library admin */
+const $ = (id) => document.getElementById(id);
+function toast(msg, err = false) { const t = $("toast"); t.textContent = msg; t.classList.toggle("err", err); t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 4000); }
+async function call(path, body) {
+  const r = await fetch(path + q, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined);
+  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || "请求失败"); return d;
+}
+let pending = null;
+function showPreview(job, sid) {
+  pending = { job, sid };
+  $("preview").innerHTML = `<div class="preview"><b>${esc(job.title)}</b>${job.city ? ` · ${esc(job.city)}` : ""}${job.education ? ` · ${esc(job.education)}` : ""}
+    <p class="muted small">${esc(job.summary)} ｜ 专业：${esc(job.majors.join("、") || "未匹配")}</p>
+    <ol>${job.requirements.map((r) => `<li>[${esc(r.level)}·${esc(r.category)}] ${esc(r.item)}</li>`).join("")}</ol>
+    <p class="small">工具：${esc(job.tools.join("、") || "—")}｜证书：${esc(job.certificates.join("、") || "—")}</p>
+    <button class="btn btn-primary btn-sm" id="aSave" type="button">确认入库</button> <button class="btn btn-ghost btn-sm" id="aCancel" type="button">取消</button></div>`;
+  $("aSave").onclick = async () => { try { await call("/api/admin/save", { job: pending.job, submission_id: pending.sid }); $("preview").innerHTML = ""; toast("已入库"); loadAdmin(); } catch (e) { toast(e.message, true); } };
+  $("aCancel").onclick = () => { $("preview").innerHTML = ""; pending = null; };
+  $("preview").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+async function extract(body, btn) {
+  const old = btn.textContent; btn.disabled = true; btn.textContent = "整理中…";
+  try { const d = await call("/api/admin/extract", body); showPreview(d.job, body.submission_id); } catch (e) { toast(e.message, true); } finally { btn.disabled = false; btn.textContent = old; }
+}
+async function loadAdmin() {
+  let d; try { d = await call("/api/admin/jobs"); } catch (e) { $("jobAdmin").classList.add("hidden"); return; }
+  $("subs").innerHTML = d.submissions.map((s) => `<div class="sub"><div class="sub-top"><b>#${s.id}</b> ${esc(s.time)}${s.note ? ` · ${esc(s.note)}` : ""}${s.url ? ` · <a href="${esc(s.url)}" target="_blank" rel="noopener">原链接</a>` : ""}</div>
+    <pre>${esc(s.text.slice(0, 400))}${s.text.length > 400 ? "…" : ""}</pre>
+    <button class="btn btn-primary btn-sm" data-ex="${s.id}" type="button">整理预览</button> <button class="btn btn-ghost btn-sm" data-drop="${s.id}" type="button">删除</button></div>`).join("") || "<p class='muted small'>暂无待审核的提交</p>";
+  $("imported").innerHTML = d.imported.map((j) => `<div class="sub"><b>${esc(j.title)}</b> <span class="muted small">${esc(j.majors.join("、"))} · ${j.total} 条要求</span> <button class="btn btn-ghost btn-sm" data-del="${esc(j.id)}" type="button">下架</button></div>`).join("") || "<p class='muted small'>还没有导入的真实招聘</p>";
+  document.querySelectorAll("[data-ex]").forEach((b) => b.onclick = () => extract({ submission_id: +b.dataset.ex }, b));
+  document.querySelectorAll("[data-drop]").forEach((b) => b.onclick = async () => { await call("/api/admin/drop", { submission_id: +b.dataset.drop }).catch((e) => toast(e.message, true)); loadAdmin(); });
+  document.querySelectorAll("[data-del]").forEach((b) => b.onclick = async () => { await call("/api/admin/delete_job", { id: b.dataset.del }).catch((e) => toast(e.message, true)); loadAdmin(); });
+}
+$("aExtract").onclick = () => { const text = $("aText").value.trim(); if (text.length < 40) return toast("至少 40 字", true); extract({ text, url: $("aUrl").value.trim() }, $("aExtract")); };
+loadAdmin();
+
+}

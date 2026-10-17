@@ -11,9 +11,11 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from zhitu import prompts
 from zhitu.kb import KnowledgeBase
+from zhitu.jobs import normalize
+from zhitu.userkey import PROVIDERS
 
-ASSETS = ("index.html", "stats.html", "app.js", "stats.js", "browser-client.js", "styles.css",
-          "favicon.ico", "favicon.svg", "apple-touch-icon.png", "og-cover.jpg")
+ASSETS = ("index.html", "stats.html", "app.js", "stats.js", "browser-client.js", "browser-ui.js", "styles.css",
+          "favicon.ico", "favicon.svg", "apple-touch-icon.png", "logo-512.png", "og-cover.jpg", "img/hero-app.jpg")
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
        "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; "
        "object-src 'none'; base-uri 'self'; form-action 'self'")
@@ -25,11 +27,14 @@ def build(output: Path, site_url: str = ""):
         raise ValueError("Build output must not overwrite source files")
     if output.exists():
         expected = set(ASSETS) | {"model-data.json", ".nojekyll", "robots.txt"}
-        if any(p.is_symlink() or p.name not in expected for p in output.iterdir()):
+        directories = {str(Path(name).parent).replace("\\", "/") for name in expected} - {"."}
+        if any(p.is_symlink() or (p.relative_to(output).as_posix() not in (directories if p.is_dir() else expected))
+               for p in output.rglob("*")):
             raise ValueError("Output contains unexpected files; choose an empty output directory")
     output.mkdir(parents=True, exist_ok=True)
     for name in ASSETS:
         source = ROOT / "web" / name
+        (output / name).parent.mkdir(parents=True, exist_ok=True)
         if source.is_symlink():
             raise ValueError("Refusing symbolic link in public assets")
         if name.endswith(".html"):
@@ -48,8 +53,14 @@ def build(output: Path, site_url: str = ""):
             shutil.copyfile(source, output / name)
     kb = KnowledgeBase(ROOT / "kb")
     try:
-        data = {"prompts": {k: getattr(prompts, k) for k in ("DIAGNOSE", "PLAN", "INTERVIEW_Q", "INTERVIEW_END", "ASK")},
-                "documents": kb.documents(), "chunks": [c.cite() for c in kb.chunks]}
+        jobs = json.loads((ROOT / "kb" / "jobs.json").read_text(encoding="utf-8"))
+        jobs["jobs"] = [normalize(j) for j in jobs["jobs"]]
+        providers = [dict(p) for p in PROVIDERS]
+        for p in providers:
+            if p["id"] == "deepseek":
+                p.update(base_url="https://api.deepseek.com/v1", model="deepseek-chat")
+        data = {"prompts": {k: getattr(prompts, k) for k in ("DIAGNOSE", "DIAGNOSE_JOB", "PLAN30", "INTERVIEW_Q", "INTERVIEW_END", "ASK")},
+                "documents": kb.documents(), "chunks": [c.cite() for c in kb.chunks], "jobs": jobs, "providers": providers}
     finally:
         kb.db.close()
     (output / "model-data.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")

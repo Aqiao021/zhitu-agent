@@ -1,9 +1,9 @@
 {
   "provider": "openai",
-  "base_url": "https://api.deepseek.com/v1",
+  "base_url": "https://api.deepseek.com",
   "api_key": "",
-  "model": "deepseek-chat",
-  "timeout": 60,
+  "model": "deepseek-flash",
+  "timeout": 120,
   "port": 8000,
   "admin_token": ""
 }

@@ -14,9 +14,12 @@ from urllib.parse import parse_qs, urlparse
 from zhitu import config as config_mod
 from zhitu.agent import Agent
 from zhitu.demo import DemoLLM
+from zhitu.jobs import JobDB
 from zhitu.kb import KnowledgeBase
 from zhitu.llm import LLM, ModelError
+from zhitu.privacy import mask
 from zhitu.store import Store
+from zhitu.userkey import public_providers, user_config
 
 ROOT = Path(__file__).resolve().parent
 WEB = ROOT / "web"
@@ -24,8 +27,9 @@ MAX_BODY = 200_000
 
 CFG = config_mod.load()
 KB = KnowledgeBase(ROOT / "kb")
-AGENT = Agent(DemoLLM() if CFG.demo else LLM(CFG), KB)
 STORE = Store(CFG.data_dir / "zhitu.db")
+JOBS = JobDB(ROOT / "kb" / "jobs.json", CFG.data_dir / "zhitu.db")
+AGENT = Agent(DemoLLM() if CFG.demo else LLM(CFG), KB, JOBS)
 SLOTS = threading.BoundedSemaphore(max(1, int(CFG.max_concurrency)))
 _HITS: dict[tuple[str, str, int], deque] = {}
 _HITS_LOCK = threading.Lock()
@@ -104,7 +108,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(403, {"error": "访问统计页需要正确口令"})
         if path == "/api/health":
             return self._json(200, {"ok": True, "demo": CFG.demo, "model": "演示模式" if CFG.demo else CFG.model,
-                                    "documents": KB.documents()})
+                                    "documents": KB.documents(), "server_key": not CFG.demo,
+                                    "allow_user_key": bool(CFG.allow_user_key),
+                                    "providers": public_providers(CFG.user_providers) if CFG.allow_user_key else []})
         if path in ("/api/stats", "/stats.csv"):
             if not self._admin_ok():
                 return self._json(403, {"error": "统计页只允许本机访问，或在网址后加 ?token=口令"})
@@ -114,6 +120,19 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, STORE.stats())
         if path == "/api/ready":
             return self._json(200, {"ok": True})
+        if path == "/api/majors":
+            return self._json(200, {"majors": JOBS.majors(), "notice": JOBS.notice, "updated": JOBS.updated,
+                                    "total_jobs": len(JOBS.all())})
+        if path == "/api/jobs":
+            qs = parse_qs(urlparse(self.path).query)
+            return self._json(200, {"results": JOBS.search(qs.get("q", [""])[0], qs.get("major", [""])[0])})
+        if path.startswith("/api/jobs/"):
+            job = JOBS.get(path.rsplit("/", 1)[1])
+            return self._json(200, job) if job else self._json(404, {"error": "没有找到这个岗位"})
+        if path == "/api/admin/jobs":
+            if not self._admin_ok():
+                return self._json(403, {"error": "需要管理口令"})
+            return self._json(200, {"submissions": JOBS.submissions(), "imported": JOBS.imported()})
         name = "index.html" if path in ("/", "") else ("stats.html" if path == "/stats" else path.lstrip("/"))
         target = (WEB / name).resolve()
         if WEB not in target.parents or not target.is_file():
@@ -138,13 +157,26 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             return self._json(400, {"error": "请求格式不正确"})
         session = str(body.get("session", ""))[:40]
+        try:
+            ucfg = user_config(CFG, body.get("llm"), CFG.user_providers)  # visitor's own key: used once, never stored
+        except ModelError as e:
+            return self._json(400, {"error": str(e)})
+        body.pop("llm", None)
+        agent = Agent(LLM(ucfg), KB, JOBS) if ucfg else AGENT
+        demo = False if ucfg else CFG.demo
         routes = {
-            "/api/diagnose": lambda: AGENT.diagnose(str(body.get("resume", "")), str(body.get("jd", ""))),
-            "/api/plan": lambda: AGENT.plan(body.get("diagnosis") or {}, body.get("weekly_hours", 10)),
-            "/api/interview": lambda: AGENT.interview(body.get("diagnosis") or {}, body.get("history") or [],
+            "/api/diagnose": lambda: agent.diagnose(str(body.get("resume", "")), str(body.get("jd", "")),
+                                                    str(body.get("job_id", ""))),
+            "/api/plan": lambda: agent.plan(body.get("diagnosis") or {}, body.get("daily_hours", 2)),
+            "/api/interview": lambda: agent.interview(body.get("diagnosis") or {}, body.get("history") or [],
                                                       body.get("rounds", 5)),
-            "/api/ask": lambda: AGENT.ask(str(body.get("question", ""))),
+            "/api/ask": lambda: agent.ask(str(body.get("question", ""))),
         }
+        if path == "/api/key/test":
+            if not ucfg:
+                return self._json(400, {"error": "请先填写 API Key"})
+            routes[path] = lambda: {"ok": bool(LLM(ucfg).chat("你是连接测试，只回复 OK。", [{"role": "user", "content": "ping"}], 8)),
+                                    "model": ucfg.model}
         if path == "/api/feedback":
             if (not allow(self._ip(), "feedback", CFG.feedback_rate_limit, 60)
                     or not allow("*", "feedback-global", 120, 60)):
@@ -155,30 +187,63 @@ class Handler(BaseHTTPRequestHandler):
             except (TypeError, ValueError):
                 return self._json(400, {"error": "评分需要 1～5"})
             return self._json(200, {"ok": True})
+        if path == "/api/jobs/submit":
+            text = str(body.get("text", "")).strip()
+            if len(text) < 40:
+                return self._json(400, {"error": "招聘信息太短，至少需要 40 字"})
+            if not allow(self._ip()):
+                return self._json(429, {"error": "提交太频繁啦，请稍后再试"})
+            JOBS.submit(mask(text)[0], str(body.get("url", "")).strip(), str(body.get("note", "")), session)
+            return self._json(200, {"ok": True})
+        if path.startswith("/api/admin/"):
+            if not self._admin_ok():
+                return self._json(403, {"error": "需要管理口令"})
+            try:
+                if path == "/api/admin/save":
+                    job = JOBS.add_imported(body.get("job") or {})
+                    if body.get("submission_id"):
+                        JOBS.drop_submission(int(body["submission_id"]))
+                    return self._json(200, {"ok": True, "job": JOBS.card(job)})
+                if path == "/api/admin/drop":
+                    JOBS.drop_submission(int(body.get("submission_id", 0)))
+                    return self._json(200, {"ok": True})
+                if path == "/api/admin/delete_job":
+                    return self._json(200, {"ok": JOBS.remove_imported(str(body.get("id", "")))})
+            except (TypeError, ValueError) as e:
+                return self._json(400, {"error": str(e) or "参数不正确"})
+            if path == "/api/admin/extract":
+                text, url = str(body.get("text", "")), str(body.get("url", ""))
+                if body.get("submission_id"):
+                    sub = JOBS.take_submission(int(body["submission_id"]))
+                    if not sub:
+                        return self._json(404, {"error": "这条提交已不存在"})
+                    text, url = sub["text"], sub["url"]
+                routes[path] = lambda: {"job": agent.extract_job(text, url)}
         if path not in routes:
             return self._json(404, {"error": "未知接口"})
-        kind = path.rsplit("/", 1)[1]
-        if not CFG.demo and not allow(self._ip()):
+        kind = {"/api/admin/extract": "import", "/api/key/test": "keytest"}.get(path, path.rsplit("/", 1)[1])
+        if not demo and not allow(self._ip()):
             return self._json(429, {"error": "使用太频繁啦，请 10 分钟后再试"})
         if not SLOTS.acquire(blocking=False):
             return self._json(503, {"error": "当前使用人数较多，请稍后再试"})
         t0 = time.time()
         try:
-            if not CFG.demo and not STORE.reserve_model_call(CFG.global_rate_limit, CFG.daily_limit):
+            if not demo and not ucfg and not STORE.reserve_model_call(CFG.global_rate_limit, CFG.daily_limit):
                 return self._json(429, {"error": "全站模型请求已达保护上限，请稍后再试或联系管理员"})
             result = routes[path]()
         except ModelError as e:
-            STORE.event(kind, False, int((time.time() - t0) * 1000), None, session, CFG.demo)
+            STORE.event(kind, False, int((time.time() - t0) * 1000), None, session, demo)
             return self._json(502, {"error": str(e)})
         except Exception:
-            STORE.event(kind, False, int((time.time() - t0) * 1000), None, session, CFG.demo)
+            STORE.event(kind, False, int((time.time() - t0) * 1000), None, session, demo)
             return self._json(500, {"error": "处理失败，请稍后重试"})
         finally:
             SLOTS.release()
         ms = int((time.time() - t0) * 1000)
         score = result.get("match_score") if kind == "diagnose" else result.get("total") if kind == "interview" else None
-        STORE.event(kind, True, ms, score, session, CFG.demo)
-        result["demo"] = CFG.demo
+        STORE.event(kind, True, ms, score, session, demo)
+        result["demo"] = demo
+        result["key"] = "user" if ucfg else "demo" if demo else "server"
         result["elapsed_ms"] = ms
         self._json(200, result)
 

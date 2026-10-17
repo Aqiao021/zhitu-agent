@@ -1,15 +1,16 @@
-import json
 import contextlib
 import io
-import os
 import socket
+import time
+from unittest.mock import patch
+import json
+import os
 import sys
 import tempfile
 import threading
 import unittest
+import urllib.parse
 import urllib.request
-import time
-from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -66,6 +67,82 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status, 502)
         self.assertIn("至少", d["error"])
 
+    def test_job_library_api(self):
+        _, _, body = self.get("/api/majors")
+        d = json.loads(body)
+        self.assertGreaterEqual(len(d["majors"]), 14)
+        _, _, body = self.get("/api/jobs?q=" + urllib.parse.quote("会计"))
+        self.assertTrue(json.loads(body)["results"])
+        _, _, body = self.get("/api/jobs/ai_trainer_annotator")
+        self.assertEqual(json.loads(body)["id"], "ai_trainer_annotator")
+        with self.assertRaises(urllib.error.HTTPError):
+            self.get("/api/jobs/nope")
+
+    def test_job_diagnose_and_plan(self):
+        status, d = self.post("/api/diagnose", {"resume": "技能：会使用 Python 和 Pandas 做数据清洗，用 LabelImg 标注过图片，会用 Excel",
+                                                "job_id": "ai_trainer_annotator"})
+        self.assertEqual(status, 200)
+        self.assertEqual(d["source"]["type"], "job")
+        status, p = self.post("/api/plan", {"diagnosis": d, "daily_hours": 1.5})
+        self.assertEqual(status, 200)
+        self.assertEqual(len(p["days"]), 30)
+        self.assertTrue(all(day["minutes"] <= 90 for day in p["days"]))
+
+    def test_submit_and_admin(self):
+        text = "岗位：仓储专员\n1. 熟悉出入库流程\n2. 会用 Excel 和 WMS\n3. 有叉车证优先\n4. 能吃苦耐劳 联系电话 13800001234"
+        status, _ = self.post("/api/jobs/submit", {"text": text})
+        self.assertEqual(status, 200)
+        _, _, body = self.get("/api/admin/jobs")  # local requests count as admin
+        subs = json.loads(body)["submissions"]
+        self.assertNotIn("13800001234", subs[0]["text"])
+        status, ex = self.post("/api/admin/extract", {"submission_id": subs[0]["id"]})
+        self.assertEqual(status, 200)
+        status, saved = self.post("/api/admin/save", {"job": ex["job"], "submission_id": subs[0]["id"]})
+        self.assertEqual(status, 200)
+        _, _, body = self.get("/api/jobs/" + saved["job"]["id"])
+        self.assertEqual(json.loads(body)["kind"], "导入")
+        self.assertTrue(self.post("/api/admin/delete_job", {"id": saved["job"]["id"]})[1]["ok"])
+
+    def test_admin_needs_token_behind_proxy(self):
+        req = urllib.request.Request(self.base + "/api/admin/jobs", headers={"X-Forwarded-For": "1.2.3.4"})
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            urllib.request.urlopen(req, timeout=5)
+        self.assertEqual(cm.exception.code, 403)
+
+    def test_user_key_routes_to_own_model(self):
+        seen = []
+
+        class FakeLLM:
+            def __init__(self, cfg):
+                seen.append(cfg)
+
+            def chat(self, system, messages, max_tokens=2000, temperature=0.3):
+                return "OK" if "连接测试" in system else json.dumps({"summary": "s", "results": [], "strengths": []})
+
+        old = server.LLM
+        server.LLM = FakeLLM
+        try:
+            k = {"provider": "zhipu", "api_key": "synthetic-test-credential", "model": "glm-4-flash"}
+            status, r = self.post("/api/key/test", {"llm": k})
+            self.assertEqual((status, r["model"]), (200, "glm-4-flash"))
+            status, d = self.post("/api/diagnose", {"resume": "技能：会使用 Python 和 Pandas 做数据清洗，会用 Excel 统计数据",
+                                                    "job_id": "ai_trainer_annotator", "llm": k})
+            self.assertEqual(status, 200)
+            self.assertFalse(d["demo"])
+            self.assertEqual(d["key"], "user")
+            self.assertNotIn("synthetic-test-credential", json.dumps(d))
+            self.assertEqual(seen[-1].base_url, "https://open.bigmodel.cn/api/paas/v4")
+        finally:
+            server.LLM = old
+        status, r = self.post("/api/key/test", {"x": 1})
+        self.assertEqual(status, 400)
+        status, r = self.post("/api/diagnose", {"resume": "x" * 40, "job_id": "ai_trainer_annotator", "llm": {"provider": "evil", "api_key": "synthetic-credential"}})
+        self.assertEqual(status, 400)
+        _, _, body = self.get("/api/health")
+        h = json.loads(body)
+        self.assertTrue(h["allow_user_key"])
+        self.assertIn("deepseek", [p["id"] for p in h["providers"]])
+
     def test_rate_limit(self):
         old = server.CFG.rate_limit
         server.CFG.rate_limit = 2
@@ -76,6 +153,7 @@ class ServerTest(unittest.TestCase):
             self.assertTrue(server.allow("8.8.8.8"))
         finally:
             server.CFG.rate_limit = old
+
 
     def test_feedback_is_rate_limited_without_writing_rejected_feedback(self):
         body = {"kind": "diagnose", "rating": 5, "session": "abuse-test"}
@@ -135,7 +213,6 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status, 503)
         self.assertLess(time.monotonic() - started, 2)
         ask.assert_not_called()
-
 
 if __name__ == "__main__":
     unittest.main()

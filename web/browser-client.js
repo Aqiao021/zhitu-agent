@@ -2,7 +2,9 @@
 (function (root) {
   'use strict';
   const STATUS = { '具备': 1, '部分具备': 0.5, '缺少': 0 };
-  const CATS = new Set(['专业技能', '工具', '项目经验', '学历证书', '综合素质']);
+  const CATS = new Set(['专业技能', '软件工具', '证书', '项目经验', '通用素养']);
+  const OLD_CATS = { '工具': '软件工具', '学历证书': '证书', '综合素质': '通用素养' };
+  const WEIGHT = { '必需': 2, '加分': 1 };
   const KINDS = new Set(['diagnose', 'plan', 'interview', 'ask']);
   const clip = (s, n = 6000) => String(s ?? '').trim().slice(0, n);
   const list = x => Array.isArray(x) ? x : [];
@@ -59,6 +61,77 @@
   }
   function refsText(refs) {
     return refs.map((c, i) => `[${i + 1}] 《${c.title}》${c.section}（来源：${c.source}）\n${c.text}`).join('\n\n');
+  }
+  function jobCard(job) {
+    return { ...job, aliases: list(job.aliases).slice(0, 3), tools: list(job.tools).slice(0, 5),
+      must: list(job.requirements).filter(r => r.level === '必需').length, total: list(job.requirements).length };
+  }
+  function schedule(data, daily, diagnosis, gaps) {
+    const modules = list(data.modules).slice(0, 10).filter(m => m && clip(m.skill)).map(m => ({
+      skill: clip(m.skill, 30), gap: clip(m.gap, 80), tools: strings(m.tools, 6, 30),
+      tasks: list(m.tasks).slice(0, 10).filter(t => t && clip(t.title)).map(t => ({
+        title: clip(t.title, 90), minutes: clamp(Math.trunc(number(t.minutes, 60)), 20, 240), output: clip(t.output, 90),
+      })),
+    })).filter(m => m.tasks.length);
+    if (!modules.length) throw new Error('计划生成失败，请重试');
+    const queue = [];
+    for (const m of modules) for (const t of m.tasks) {
+      const parts = Math.ceil(t.minutes / daily);
+      for (let p = 0; p < parts; p++) queue.push({
+        ...t, title: t.title + (parts > 1 ? `（${p + 1}/${parts}）` : ''),
+        minutes: Math.max(20, Math.min(daily, t.minutes - p * daily)),
+        output: p === parts - 1 ? t.output : '完成这一部分并记下卡住的地方', skill: m.skill, tools: m.tools,
+      });
+    }
+    const fp = data.final_project || {}, days = [], used = new Map();
+    const project = { title: clip(fp.title, 40) || `${diagnosis.job_title || '目标岗位'}综合小项目`,
+      desc: clip(fp.desc, 160) || '把前面学到的技能串起来，做一个能写进简历的小作品',
+      output: clip(fp.output, 90) || '可演示的作品和一页说明' };
+    let rotate = 0;
+    const tools = [...new Set(modules.flatMap(m => m.tools))];
+    for (let day = 1; day <= 30; day++) {
+      let type = '学习', theme, tasks;
+      if (day === 30) {
+        type = '面试'; theme = '更新简历 · 复诊 · 模拟面试';
+        const half = Math.min(60, Math.floor(daily / 2));
+        tasks = [{ title: '根据 30 天的成果更新简历，只写真实做到的内容', minutes: half, output: '新版简历，每项技能都能对应一个作品或任务' },
+          { title: '重新做一次差距诊断，并完成一轮模拟面试', minutes: daily - half, output: '对比第 1 天的匹配度，记下还要继续补的项' }]
+          .map(t => ({ ...t, skill: '求职准备', tools: [] }));
+      } else if ([7, 14, 21, 28].includes(day)) {
+        type = '复盘'; theme = '复盘与自测';
+        const recent = [...new Set(days.slice(-6).flatMap(d => d.tasks.map(t => t.skill)))].filter(s => !['复盘', '求职准备', '综合项目'].includes(s)).sort();
+        const topic = recent.slice(0, 3).join('、') || '本周内容', half = Math.floor(daily / 2);
+        tasks = [{ title: `复盘本周：整理 ${topic} 的笔记和代码/作品`, minutes: half, output: '一页复盘：学会了什么、还卡在哪里' },
+          { title: `不看笔记重做一遍本周最难的练习（${topic}）`, minutes: daily - half, output: '能独立完成，或写下具体卡点去问老师同学' }]
+          .map(t => ({ ...t, skill: '复盘', tools: [] }));
+      } else if ([26, 27, 29].includes(day)) {
+        type = '项目'; theme = '综合项目';
+        const i = [26, 27, 29].indexOf(day);
+        const titles = [`综合项目设计：${project.title}，列出功能和要用的技能`, `综合项目实现：完成${project.title}的主要部分`, `综合项目收尾：测试、截图，写项目说明（${project.output}）`];
+        tasks = [{ title: titles[i], minutes: daily, output: i === 2 ? project.output : '完成当天部分并提交到作品文件夹', skill: '综合项目', tools: tools.slice().sort().slice(0, 6) }];
+      } else {
+        let left = daily; tasks = [];
+        while (queue.length && queue[0].minutes <= left && tasks.length < 3) {
+          const t = queue.shift(); left -= t.minutes; tasks.push(t);
+        }
+        if (!tasks.length && queue.length) tasks.push({ ...queue.shift(), minutes: daily });
+        if (!tasks.length) {
+          const m = modules[rotate++ % modules.length];
+          tasks.push({ title: `巩固练习：${m.skill}，独立重做一遍前面的练习并加一个新功能`, minutes: daily,
+            output: '不看笔记完成，并能讲清每一步', skill: m.skill, tools: m.tools });
+        }
+        for (const t of tasks) {
+          if (!used.has(t.skill)) used.set(t.skill, new Set());
+          used.get(t.skill).add(day);
+        }
+        theme = [...new Set(tasks.map(t => t.skill))].join('、');
+      }
+      days.push({ day, week: Math.floor((day - 1) / 7) + 1, type, theme,
+        tasks: tasks.map((t, i) => ({ ...t, id: `d${day}-${i}` })), minutes: tasks.reduce((n, t) => n + t.minutes, 0) });
+    }
+    return { daily_minutes: daily, days, skills: modules.map(m => ({ skill: m.skill, gap: m.gap, tools: m.tools, days: [...(used.get(m.skill) || [])] })),
+      tools, certificates: gaps.some(g => g.category === '证书') ? list(diagnosis.job?.certificates).slice(0, 4) : [], project,
+      unscheduled: queue.slice(0, 20).map(t => t.title), tips: strings(data.tips, 3, 80), job_title: diagnosis.job_title || '', created: new Date().toLocaleDateString('sv-SE') };
   }
   class Records {
     constructor(storage) { this.storage = storage; }
@@ -122,12 +195,13 @@
       this.averageLength = this.index.reduce((n, x) => n + x.length, 0) / (this.index.length || 1);
     }
     setStatus(status) { this.status = status; this.onStatus(status); }
-    configure({ key, baseURL = 'https://api.deepseek.com/v1', model = 'deepseek-chat' }) {
+    configure({ key, baseURL = 'https://api.deepseek.com/v1', model = 'deepseek-chat', provider = 'openai' }) {
       const url = new URL(baseURL);
       if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('接口地址必须是 HTTPS，且不能包含账号、密码、参数或片段');
       if (!key?.trim() || /[\r\n]/.test(key) || !model?.trim()) throw new Error('请填写有效的 API Key 和模型名称');
       this.disconnect();
-      this.#settings = { key: key.trim(), baseURL: url.href.replace(/\/$/, ''), model: model.trim() };
+      if (!['openai', 'anthropic'].includes(provider)) throw new Error('不支持的接口类型');
+      this.#settings = { key: key.trim(), baseURL: url.href.replace(/\/$/, ''), model: model.trim(), provider };
       this.setStatus('configured');
     }
     disconnect() {
@@ -135,6 +209,34 @@
       this.#controller?.abort();
       this.#settings = null;
       this.setStatus('disconnected');
+    }
+    get(path) {
+      const url = new URL(path, 'https://local.invalid'), library = this.data.jobs || {}, jobs = list(library.jobs);
+      if (url.pathname === '/api/majors') return { notice: library.notice || '', updated: library.updated || '', total_jobs: jobs.length,
+        majors: list(library.majors).map(m => ({ ...m, count: jobs.filter(j => list(j.majors).includes(m.name)).length })) };
+      if (url.pathname.startsWith('/api/jobs/')) {
+        const job = jobs.find(j => j.id === decodeURIComponent(url.pathname.slice('/api/jobs/'.length)));
+        if (!job) throw new Error('岗位库里没有找到这个岗位，请重新选择');
+        return structuredClone(job);
+      }
+      if (url.pathname === '/api/jobs') {
+        const q = clip(url.searchParams.get('q'), 60).toLowerCase(), major = url.searchParams.get('major') || '';
+        let qt = new Set(tokens(q).filter(t => t.length > 1));
+        if (!qt.size) qt = new Set(tokens(q));
+        const results = jobs.filter(j => !major || list(j.majors).includes(major)).map(j => {
+          if (!q) return { job: j, score: 0 };
+          const title = [j.title, ...list(j.aliases)].join(' ').toLowerCase();
+          const body = [j.summary, ...list(j.majors), ...list(j.tools), ...list(j.requirements).flatMap(r => [r.item, ...list(r.keywords)])].join(' ').toLowerCase();
+          const tt = new Set(tokens(title)), bt = new Set(tokens(body));
+          let score = title.includes(q) ? 10 + ([j.title, ...list(j.aliases)].some(s => s.toLowerCase().startsWith(q)) ? 3 : 0) : body.includes(q) ? 4 : 0;
+          for (const t of qt) score += (tt.has(t) ? 2 : 0) + (bt.has(t) ? 0.5 : 0);
+          return { job: j, score };
+        }).filter(x => !q || x.score >= Math.max(1.5, 0.5 * qt.size))
+          .sort((a, b) => b.score - a.score || (a.job.kind !== '导入') - (b.job.kind !== '导入') || a.job.title.localeCompare(b.job.title, 'zh-CN'))
+          .slice(0, 40).map(x => jobCard(x.job));
+        return structuredClone({ results });
+      }
+      throw new Error('不支持的查询');
     }
     search(query, k) {
       const terms = [...new Set(tokens(query))], n = this.index.length;
@@ -151,10 +253,11 @@
     async chat(system, user, maxTokens = 2000, temperature = 0.3) {
       const settings = this.#settings;
       if (!settings) throw new Error('请先连接模型，填写你自己的 API Key');
-      const response = await this.fetch(settings.baseURL + '/chat/completions', {
+      const anthropic = settings.provider === 'anthropic';
+      const response = await this.fetch(settings.baseURL + (anthropic ? '/messages' : '/chat/completions'), {
         method: 'POST', redirect: 'error', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.key}` },
-        body: JSON.stringify({ model: settings.model, max_tokens: maxTokens, temperature, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
+        headers: { 'Content-Type': 'application/json', ...(anthropic ? { 'x-api-key': settings.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' } : { Authorization: `Bearer ${settings.key}` }) },
+        body: JSON.stringify({ model: settings.model, max_tokens: maxTokens, temperature, ...(anthropic ? { system, messages: [{ role: 'user', content: user }] } : { messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }) }),
         signal: this.#controller.signal,
       });
       if (this.#controller.signal.aborted) throw new Error('请求已取消');
@@ -164,7 +267,7 @@
         throw new Error(`模型接口 HTTP ${response.status}：${reason}`);
       }
       const body = await response.json();
-      const text = body?.choices?.[0]?.message?.content;
+      const text = anthropic ? list(body?.content).filter(b => b.type === 'text').map(b => b.text).join('') : body?.choices?.[0]?.message?.content;
       if (typeof text !== 'string' || !text.trim()) throw new Error('模型没有返回有效内容，请检查模型是否支持聊天接口');
       if (this.#controller.signal.aborted) throw new Error('请求已取消');
       this.setStatus('connected');
@@ -187,7 +290,8 @@
       if (this.#controller) throw new Error('正在处理上一个请求，请等待完成后再试');
       const generation = this.#generation, start = Date.now();
       this.#controller = new AbortController();
-      const timer = setTimeout(() => this.#controller?.abort(), 60000);
+      const timeout = kind === 'plan' ? 120000 : 60000;
+      const timer = setTimeout(() => this.#controller?.abort(), timeout);
       try {
         const result = kind === 'test' ? (await this.chat('这是连接测试，请只回复 OK。', 'OK', 8), { ok: true }) : await this[kind](body);
         if (generation !== this.#generation) throw new Error('请求已取消');
@@ -197,16 +301,31 @@
       } catch (error) {
         if (kind !== 'test' && generation === this.#generation) this.record({ type: 'event', kind, ok: false, ms: Date.now() - start, score: null });
         if (generation !== this.#generation) throw new Error('请求已取消');
-        if (this.#controller.signal.aborted) throw new Error('等待超过 60 秒，请稍后重试；服务商可能已处理本次请求');
+        if (this.#controller.signal.aborted) throw new Error(`等待超过 ${timeout / 1000} 秒，请稍后重试；服务商可能已处理本次请求`);
         if (error instanceof TypeError) throw new Error('无法连接模型接口，请检查网络、接口地址及服务商是否允许浏览器跨域访问');
         throw error;
       } finally { clearTimeout(timer); this.#controller = null; }
     }
-    async diagnose({ resume, jd }) {
+    async diagnose({ resume, jd, job_id }) {
       resume = clip(resume); jd = clip(jd);
-      if (norm(resume).length < 30 || norm(jd).length < 20) throw new Error('简历至少 30 字、招聘信息至少 20 字');
-      const masked = mask(resume), refs = this.search(mask(jd).text, 3);
-      const data = extractJSON(await this.chat(this.data.prompts.DIAGNOSE, `【招聘信息】\n${mask(jd).text}\n\n【简历】\n${masked.text}\n\n【参考资料】\n${refsText(refs) || '（无）'}`, 2500));
+      if (norm(resume).length < 30 || (!job_id && norm(jd).length < 20)) throw new Error('简历至少 30 字、招聘信息至少 20 字');
+      const job = job_id ? this.get('/api/jobs/' + encodeURIComponent(job_id)) : null;
+      const masked = mask(resume), refs = this.search(job ? job.title + ' ' + list(job.tools).slice(0, 5).join(' ') : mask(jd).text, 3);
+      const lines = job ? list(job.requirements).map((r, i) => {
+        const hits = list(r.keywords).filter(k => k && masked.text.toLowerCase().includes(k.toLowerCase())).slice(0, 6);
+        return `${i + 1}. [${r.level}·${r.category}] ${r.item}（简历中出现的相关词：${hits.join('、') || '无'}）`;
+      }).join('\n') : '';
+      const user = (job ? `【岗位】${job.title}：${job.summary}\n【岗位要求】\n${lines}` : `【招聘信息】\n${mask(jd).text}`)
+        + `\n\n【简历】\n${masked.text}\n\n【参考资料】\n${refsText(refs) || '（无）'}`;
+      const data = extractJSON(await this.chat(job ? this.data.prompts.DIAGNOSE_JOB : this.data.prompts.DIAGNOSE, user, job ? 3000 : 2500));
+      if (job) {
+        const byNumber = new Map(list(data.results).filter(r => r && Number.isInteger(Number(r.n))).map(r => [Number(r.n), r]));
+        data.requirements = job.requirements.map((r, i) => {
+          const got = byNumber.get(i + 1) || {};
+          return { ...r, status: got.status, evidence: got.evidence, advice: got.advice || '先补这一项的基础，再做一个能展示的小练习' };
+        });
+        data.job_title = job.title;
+      }
       let flagged = 0;
       const requirements = list(data.requirements).slice(0, 15).filter(r => r && clip(r.item)).map(r => {
         let status = Object.hasOwn(STATUS, r.status) ? r.status : '缺少';
@@ -214,30 +333,27 @@
         const verified = !!evidence && norm(masked.text).includes(norm(evidence));
         if (evidence && !verified) { flagged++; evidence = ''; note = '模型给出的依据在简历中找不到原文，已降级处理'; }
         if (!evidence && status === '具备') { status = '部分具备'; note ||= '简历中没有找到明确依据'; }
-        return { item: clip(r.item, 60), category: CATS.has(r.category) ? r.category : '专业技能', status, evidence: evidence.slice(0, 200), verified, note, advice: clip(r.advice, 80) };
+        const category = OLD_CATS[r.category] || r.category;
+        return { item: clip(r.item, 80), category: CATS.has(category) ? category : '专业技能', level: Object.hasOwn(WEIGHT, r.level) ? r.level : '必需', status, evidence: evidence.slice(0, 200), verified, note, advice: clip(r.advice, 80) };
       });
       if (!requirements.length) throw new Error('没有识别出岗位要求，请检查招聘信息后重试');
       const counts = Object.fromEntries(Object.keys(STATUS).map(s => [s, requirements.filter(r => r.status === s).length]));
-      const score = Math.round(100 * requirements.reduce((s, r) => s + STATUS[r.status], 0) / requirements.length);
-      return { job_title: clip(data.job_title || '目标岗位', 40), summary: clip(data.summary, 300), requirements: requirements.sort((a, b) => STATUS[a.status] - STATUS[b.status]), counts, match_score: score, strengths: strings(data.strengths, 3, 80), honesty_notes: strings(data.honesty_notes, 5, 120), standard_note: clip(data.standard_note, 200), references: refs, privacy: masked.counts, unverified_evidence: flagged };
+      const score = Math.round(100 * requirements.reduce((s, r) => s + STATUS[r.status] * WEIGHT[r.level], 0) / requirements.reduce((s, r) => s + WEIGHT[r.level], 0));
+      return { job_title: clip(data.job_title || '目标岗位', 40), summary: clip(data.summary, 300), requirements: requirements.sort((a, b) => STATUS[a.status] - STATUS[b.status] || WEIGHT[b.level] - WEIGHT[a.level]), counts, match_score: score,
+        must_gaps: requirements.filter(r => r.level === '必需' && r.status === '缺少').length,
+        strengths: strings(data.strengths, 3, 80), honesty_notes: strings(data.honesty_notes, 5, 120), standard_note: clip(data.standard_note, 200), references: refs, privacy: masked.counts, unverified_evidence: flagged,
+        source: job ? { type: 'job', id: job.id, kind: job.kind, sources: list(job.sources).slice(0, 3) } : { type: 'paste' },
+        ...(job ? { job: { id: job.id, title: job.title, tools: job.tools, certificates: job.certificates } } : {}) };
     }
-    async plan({ diagnosis, weekly_hours }) {
-      const hours = clamp(Math.trunc(number(weekly_hours, 10)), 3, 40);
-      const gaps = list(diagnosis?.requirements).filter(r => r.status !== '具备').map(({ item, category, status, advice }) => ({ item, category, status, advice }));
+    async plan({ diagnosis, daily_hours }) {
+      const daily = clamp(Math.round(number(daily_hours, 2) * 2) / 2, 1, 4) * 60;
+      const rank = { '必需缺少': 0, '必需部分具备': 1, '加分缺少': 2, '加分部分具备': 3 };
+      const gaps = list(diagnosis?.requirements).filter(r => r.status !== '具备').map(({ item, category, level = '必需', status, advice }) => ({ item, category, level, status, advice }))
+        .sort((a, b) => (rank[a.level + a.status] ?? 4) - (rank[b.level + b.status] ?? 4));
       if (!gaps.length) throw new Error('请先完成一次包含待补差距的诊断');
-      const data = extractJSON(await this.chat(this.data.prompts.PLAN, `每周可用时间：${hours} 小时\n差距诊断：${JSON.stringify({ job_title: diagnosis.job_title, gaps })}`, 2500));
-      const weeks = list(data.weeks).slice(0, 4).filter(w => w && typeof w === 'object').map((w, i) => {
-        const tasks = list(w.tasks).slice(0, 5).filter(t => t && clip(t.task)).map(t => ({ task: clip(t.task, 80), hours: clamp(number(t.hours, 1), 0.5, 40), check: clip(t.check, 80) }));
-        const total = tasks.reduce((s, t) => s + t.hours, 0);
-        if (total > hours) {
-          // Reserve the minimum half-hour per task, then divide the remaining time.
-          const remaining = hours - tasks.length * 0.5, weight = total - tasks.length * 0.5;
-          for (const t of tasks) t.hours = Math.floor((0.5 + (t.hours - 0.5) / weight * remaining) * 10 + 1e-8) / 10;
-        }
-        return { week: i + 1, goal: clip(w.goal, 60), tasks, hours: +tasks.reduce((s, t) => s + t.hours, 0).toFixed(1) };
-      }).filter(w => w.tasks.length);
-      if (!weeks.length) throw new Error('模型没有返回有效计划，请重试');
-      return { weekly_hours: hours, weeks, tips: strings(data.tips, 3, 80) };
+      const brief = JSON.stringify({ job_title: diagnosis.job_title, job_tools: list(diagnosis.job?.tools).slice(0, 12), gaps: gaps.slice(0, 10) });
+      const data = extractJSON(await this.chat(this.data.prompts.PLAN30, `每天可用时间：${daily} 分钟\n学习日共 22 天，学习日总时长约 ${daily * 22} 分钟\n差距诊断：${brief}`, 4000));
+      return schedule(data, daily, diagnosis, gaps);
     }
     async interview({ diagnosis, history, rounds }) {
       if (!diagnosis) throw new Error('请先完成一次诊断');

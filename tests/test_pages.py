@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -25,6 +26,16 @@ class PagesBuildTest(unittest.TestCase):
             self.assertNotIn('href="/stats', html)
             stats = (out / "stats.html").read_text(encoding="utf-8")
             self.assertNotIn('href="/', stats)
+            data = json.loads((out / "model-data.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(data["jobs"]["jobs"]), 35)
+            self.assertEqual(len(data["jobs"]["majors"]), 14)
+            self.assertIn("DIAGNOSE_JOB", data["prompts"])
+            self.assertIn("PLAN30", data["prompts"])
+            self.assertTrue(all("api_key" not in p for p in data["providers"]))
+            deepseek = next(p for p in data["providers"] if p["id"] == "deepseek")
+            self.assertEqual(deepseek["model"], "deepseek-chat")
+            self.assertIn('<script src="browser-client.js">', html)
+            self.assertIn('href="stats.html"', html)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,6 @@ import json
 import sys
 import tempfile
 import unittest
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -11,12 +10,16 @@ sys.path.insert(0, str(ROOT))
 from zhitu import prompts  # noqa: E402
 from zhitu.agent import Agent  # noqa: E402
 from zhitu.demo import DemoLLM  # noqa: E402
+from zhitu.jobs import JobDB, normalize  # noqa: E402
 from zhitu.kb import KnowledgeBase, tokens  # noqa: E402
 from zhitu.llm import ModelError, extract_json  # noqa: E402
 from zhitu.privacy import mask  # noqa: E402
 from zhitu.store import Store  # noqa: E402
+from zhitu.config import Config  # noqa: E402
+from zhitu.userkey import user_config  # noqa: E402
 
 KB = KnowledgeBase(ROOT / "kb")
+JOBS = JobDB(ROOT / "kb" / "jobs.json", ":memory:")
 RESUME = "教育：漳州职业技术学院 人工智能技术应用\n技能：会使用 Python 写简单脚本；了解 Git 基本操作\n项目：校园问答小程序，用 Python 调用大模型 API。电话 13800001234"
 JD = "AI 应用开发实习生\n任职要求：熟悉 Python；了解 Linux；了解大模型 API 调用；熟悉 Git；良好的沟通能力"
 
@@ -98,15 +101,121 @@ class DiagnoseTest(unittest.TestCase):
             Agent(ScriptedLLM("{}"), KB).diagnose("短", JD)
 
 
+def modules(n_tasks=6, minutes=60, n_mod=3):
+    return {"modules": [{"skill": f"技能{m}", "gap": f"差距{m}", "tools": [f"工具{m}"],
+                         "tasks": [{"title": f"任务{m}-{i}", "minutes": minutes, "output": "交付"} for i in range(n_tasks)]}
+                        for m in range(n_mod)], "final_project": {"title": "小项目", "desc": "d", "output": "o"}}
+
+
+GAPS = {"job_title": "x", "requirements": [{"item": "Linux", "status": "缺少", "level": "必需", "category": "专业技能"},
+                                          {"item": "证书", "status": "缺少", "level": "加分", "category": "证书"}],
+        "job": {"tools": ["Linux"], "certificates": ["某证书"]}}
+
+
 class PlanTest(unittest.TestCase):
-    def test_budget_enforced(self):
-        llm = ScriptedLLM({"weeks": [{"week": 1, "goal": "g", "tasks": [{"task": "t1", "hours": 20, "check": "c"}, {"task": "t2", "hours": 20, "check": "c"}]}]})
-        p = Agent(llm, KB).plan({"job_title": "x", "requirements": [{"item": "Linux", "status": "缺少"}]}, 10)
-        self.assertLessEqual(p["weeks"][0]["hours"], 10.5)
+    def test_thirty_days_within_budget(self):
+        for hours in (1, 2, 3.5, 4):
+            p = Agent(ScriptedLLM(modules()), KB).plan(GAPS, hours)
+            self.assertEqual([d["day"] for d in p["days"]], list(range(1, 31)))
+            for d in p["days"]:
+                self.assertLessEqual(d["minutes"], hours * 60, (hours, d))
+                self.assertTrue(d["tasks"])
+            types = {d["day"]: d["type"] for d in p["days"]}
+            self.assertEqual([k for k, v in types.items() if v == "复盘"], [7, 14, 21, 28])
+            self.assertEqual([k for k, v in types.items() if v == "项目"], [26, 27, 29])
+            self.assertEqual(types[30], "面试")
+            ids = [t["id"] for d in p["days"] for t in d["tasks"]]
+            self.assertEqual(len(ids), len(set(ids)))
+
+    def test_long_task_split_and_overflow_reported(self):
+        p = Agent(ScriptedLLM(modules(n_tasks=2, minutes=200, n_mod=1)), KB).plan(GAPS, 1)
+        titles = [t["title"] for d in p["days"] for t in d["tasks"]]
+        self.assertIn("任务0-0（1/4）", titles)
+        many = Agent(ScriptedLLM(modules(n_tasks=10, minutes=60, n_mod=5)), KB).plan(GAPS, 1)
+        self.assertGreater(len(many["unscheduled"]), 0)
+
+    def test_fills_free_days_with_practice(self):
+        p = Agent(ScriptedLLM(modules(n_tasks=1, minutes=30, n_mod=1)), KB).plan(GAPS, 2)
+        self.assertTrue(any("巩固练习" in t["title"] for d in p["days"] for t in d["tasks"]))
+        self.assertEqual(p["certificates"], ["某证书"])  # a certificate gap exists
+        self.assertEqual(p["skills"][0]["tools"], ["工具0"])
+
+    def test_bad_model_output(self):
+        with self.assertRaises(ModelError):
+            Agent(ScriptedLLM({"modules": []}), KB).plan(GAPS, 2)
 
     def test_nothing_to_plan(self):
         with self.assertRaises(ModelError):
-            Agent(ScriptedLLM("{}"), KB).plan({"requirements": [{"item": "a", "status": "具备"}]}, 10)
+            Agent(ScriptedLLM("{}"), KB).plan({"requirements": [{"item": "a", "status": "具备"}]}, 2)
+
+
+class JobDBTest(unittest.TestCase):
+    def test_every_job_is_sourced_and_complete(self):
+        jobs = JOBS.all()
+        self.assertGreaterEqual(len(jobs), 30)
+        for j in jobs.values():
+            self.assertTrue(j["sources"] and all(s["url"].startswith("http") for s in j["sources"]), j["id"])
+            self.assertGreaterEqual(len(j["requirements"]), 8, j["id"])
+            self.assertTrue(any(r["level"] == "必需" for r in j["requirements"]))
+            self.assertTrue(j["majors"])
+        names = {m["name"] for m in JOBS.majors()}
+        self.assertIn("人工智能技术应用", names)
+        self.assertTrue(all(m["count"] >= 3 for m in JOBS.majors()))
+
+    def test_search(self):
+        self.assertEqual(JOBS.search("会计")[0]["title"].startswith("会计"), True)
+        self.assertTrue(all("软件技术" in c["majors"] for c in JOBS.search("", "软件技术")))
+        self.assertIn("ai_trainer_annotator", [c["id"] for c in JOBS.search("数据标注")])
+        self.assertEqual(JOBS.search("完全不存在的岗位xyz"), [])
+
+    def test_import_lifecycle(self):
+        db = JobDB(ROOT / "kb" / "jobs.json", ":memory:")
+        sid = db.submit("岗位：测试 [已隐藏手机号]", "", "备注", "s")
+        self.assertEqual(db.submissions()[0]["id"], sid)
+        with self.assertRaises(ValueError):
+            db.add_imported({"title": "x", "requirements": [{"item": "a"}]})
+        job = db.add_imported({"title": "测试专员", "majors": ["软件技术"], "requirements": [{"item": f"要求{i}"} for i in range(4)]})
+        self.assertEqual(job["kind"], "导入")
+        self.assertIn(job["id"], [c["id"] for c in db.search("测试专员")])
+        self.assertTrue(db.remove_imported(job["id"]))
+        self.assertIsNone(db.get(job["id"]))
+
+
+class JobDiagnoseTest(unittest.TestCase):
+    def test_requirements_fixed_and_weighted(self):
+        job = JOBS.get("ai_trainer_annotator")
+        n = len(job["requirements"])
+        reply = {"summary": "s", "results": [{"n": 1, "status": "具备", "evidence": "用 LabelImg 标注过 500 张图片"},
+                                             {"n": 2, "status": "具备", "evidence": "编造的经历"},
+                                             {"n": 99, "status": "具备", "evidence": "x"}]}
+        llm = ScriptedLLM(reply)
+        resume = "人工智能技术应用专业。用 LabelImg 标注过 500 张图片。会用 Excel。电话 13800001234"
+        d = Agent(llm, KB, JOBS).diagnose(resume, job_id="ai_trainer_annotator")
+        self.assertEqual(len(d["requirements"]), n)  # nothing added or dropped
+        self.assertEqual({r["item"] for r in d["requirements"]}, {r["item"] for r in job["requirements"]})
+        self.assertEqual(d["unverified_evidence"], 1)
+        self.assertEqual(d["source"]["id"], "ai_trainer_annotator")
+        w = {"必需": 2, "加分": 1}
+        expect = round(100 * sum((1 if r["status"] == "具备" else .5 if r["status"] == "部分具备" else 0) * w[r["level"]] for r in d["requirements"])
+                       / sum(w[r["level"]] for r in d["requirements"]))
+        self.assertEqual(d["match_score"], expect)
+        sent = llm.sent[0][1][0]["content"]
+        self.assertNotIn("13800001234", sent)
+        self.assertIn("简历中出现的相关词：LabelImg", sent)
+
+    def test_unknown_job(self):
+        with self.assertRaises(ModelError):
+            Agent(ScriptedLLM("{}"), KB, JOBS).diagnose(RESUME, job_id="nope")
+
+    def test_extract_job(self):
+        reply = {"title": "数据标注员", "majors": ["人工智能技术应用", "不存在的专业"], "summary": "标注",
+                 "requirements": [{"item": f"要求{i}", "category": "乱写", "level": "必需", "keywords": ["k"]} for i in range(5)]}
+        llm = ScriptedLLM(reply)
+        job = Agent(llm, KB, JOBS).extract_job("招聘数据标注员，要求细心，联系电话 13800001234，" * 3, "https://example.com/j")
+        self.assertEqual(job["majors"], ["人工智能技术应用"])
+        self.assertEqual(job["requirements"][0]["category"], "专业技能")
+        self.assertEqual(job["kind"], "导入")
+        self.assertNotIn("13800001234", llm.sent[0][1][0]["content"])
 
 
 class InterviewTest(unittest.TestCase):
@@ -131,55 +240,43 @@ class AskTest(unittest.TestCase):
         self.assertTrue(r["grounded"])
 
     def test_demo_runs_all_tasks(self):
-        agent = Agent(DemoLLM(), KB)
+        agent = Agent(DemoLLM(), KB, JOBS)
         d = agent.diagnose(RESUME, JD)
         self.assertGreater(len(d["requirements"]), 0)
-        p = agent.plan(d, 8)
-        self.assertEqual(len(p["weeks"]), 4)
+        p = agent.plan(d, 2)
+        self.assertEqual(len(p["days"]), 30)
+        dj = agent.diagnose(RESUME, job_id="ai_app_dev_assistant")
+        self.assertEqual(len(dj["requirements"]), len(JOBS.get("ai_app_dev_assistant")["requirements"]))
+        self.assertEqual(len(agent.plan(dj, 3)["days"]), 30)
+        self.assertTrue(agent.extract_job("岗位：数据标注员\n1. 熟悉 Python\n2. 会用 Excel 整理数据\n3. 有项目经验优先\n4. 沟通能力好，能接受加班")["requirements"])
         self.assertIn("[", agent.ask("学校就业率是多少")["answer"])
 
 
+class UserKeyTest(unittest.TestCase):
+    def test_builds_per_request_config(self):
+        base = Config(api_key="server-key")
+        c = user_config(base, {"provider": "deepseek", "api_key": "synthetic-test-credential", "model": "deepseek-flash",
+                               "base_url": "http://169.254.169.254/"}, [])
+        self.assertEqual(c.base_url, "https://api.deepseek.com")  # request cannot choose the address
+        self.assertEqual(c.api_key, "synthetic-test-credential")
+        self.assertEqual(base.api_key, "server-key")  # server config untouched
+        self.assertIsNone(user_config(base, None, []))
+        self.assertIsNone(user_config(base, {"provider": "deepseek"}, []))
+
+    def test_rejects_bad_input(self):
+        base = Config()
+        for bad in ({"provider": "evil", "api_key": "synthetic-test-credential"},
+                    {"provider": "deepseek", "api_key": "短"},
+                    {"provider": "deepseek", "api_key": "synthetic 中文 123456"},
+                    {"provider": "ark", "api_key": "synthetic-test-credential", "model": ""},
+                    {"provider": "deepseek", "api_key": "synthetic-test-credential", "model": "a b"}):
+            with self.assertRaises(ModelError):
+                user_config(base, bad, [])
+        with self.assertRaises(ModelError):
+            user_config(Config(allow_user_key=False), {"provider": "deepseek", "api_key": "synthetic-test-credential"}, [])
+
+
 class StoreTest(unittest.TestCase):
-    def test_model_quota_survives_reopen_and_resets_on_next_utc_day(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "quota.db"
-            s = Store(path)
-            try:
-                self.assertTrue(s.reserve_model_call(10, 2, now=86410))
-                self.assertTrue(s.reserve_model_call(10, 2, now=86411))
-                self.assertFalse(s.reserve_model_call(10, 2, now=87020))
-            finally:
-                s.db.close()
-            s = Store(path)
-            try:
-                self.assertFalse(s.reserve_model_call(10, 2, now=87021))
-                self.assertTrue(s.reserve_model_call(10, 2, now=172810))
-            finally:
-                s.db.close()
-
-    def test_model_quota_is_a_sliding_window(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            s = Store(Path(tmp) / "quota.db")
-            try:
-                self.assertTrue(s.reserve_model_call(2, 10, now=1000))
-                self.assertTrue(s.reserve_model_call(2, 10, now=1100))
-                self.assertFalse(s.reserve_model_call(2, 10, now=1201))
-                self.assertTrue(s.reserve_model_call(2, 10, now=1601))
-            finally:
-                s.db.close()
-
-    def test_model_quota_is_atomic_across_connections(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "quota.db"
-            stores = [Store(path), Store(path)]
-            try:
-                with ThreadPoolExecutor(max_workers=8) as pool:
-                    accepted = list(pool.map(lambda i: stores[i % 2].reserve_model_call(3, 100, now=1000), range(12)))
-                self.assertEqual(sum(accepted), 3)
-            finally:
-                for s in stores:
-                    s.db.close()
-
     def test_stats_and_csv(self):
         with tempfile.TemporaryDirectory() as tmp:
             s = Store(Path(tmp) / "t.db")

@@ -23,8 +23,8 @@ class LLM:
                 return self._once(system, messages, max_tokens, temperature)
             except ModelError as e:
                 last = e
-                if "HTTP 4" in str(e) and "HTTP 429" not in str(e):
-                    break
+                if ("HTTP 4" in str(e) and "HTTP 429" not in str(e)) or "超时" in str(e):
+                    break  # 参数错误不必重试；超时再等一轮会让页面等太久
                 time.sleep(1.5 * (attempt + 1))
         raise last or ModelError("模型请求失败")
 
@@ -47,7 +47,9 @@ class LLM:
             with urllib.request.urlopen(req, timeout=c.timeout) as r:
                 data = json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
-            raise ModelError(f"模型接口返回 HTTP {e.code}，请检查 config.json 里的地址、模型名和密钥") from None
+            hint = {401: "API Key 不正确或已失效", 402: "账户余额不足", 403: "没有权限或余额不足", 404: "模型名或接口地址不正确",
+                    429: "请求太频繁或额度用完"}.get(e.code, "请检查接口地址、模型名和 API Key")
+            raise ModelError(f"模型接口返回 HTTP {e.code}：{hint}") from None
         except (urllib.error.URLError, TimeoutError, OSError):
             raise ModelError(f"连接模型超时或失败（等待上限 {c.timeout} 秒），请检查网络后重试") from None
         try:
