@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="职途助手：面向高职学生的求职差距诊断平台。按专业检索 14 个热门高职专业的岗位画像，逐条诊断能力差距，生成 30 天每日补差计划，模拟面试。">
+<meta name="description" content="职途助手：面向高职学生的求职差距诊断平台。按专业检索 19 个高职专业、45 个岗位画像，海投时统计多个岗位的共同要求，逐条诊断能力差距，生成 30 天每日补差计划，模拟面试。">
 <title>职途助手 · 高职生求职差距诊断平台</title>
 <link rel="icon" href="favicon.ico" sizes="32x32">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -87,7 +87,7 @@
           <p>覆盖求职准备的完整流程，每一步的结论都可追溯、可核验。</p>
         </div>
         <div class="feature-grid">
-          <a class="feature" href="#/app/jobs"><span class="fi" data-icon="briefcase"></span><h3>岗位库检索</h3><p>按专业或岗位名检索典型岗位，查看必需与加分要求、常用软件、可考证书和资料来源。</p><span class="more">进入岗位库<span data-icon="arrow"></span></span></a>
+          <a class="feature" href="#/app/jobs"><span class="fi" data-icon="briefcase"></span><h3>岗位库与海投分析</h3><p>按专业或岗位名检索典型岗位；海投时选多个岗位，程序统计它们的共同要求和最常用的软件。</p><span class="more">进入岗位库<span data-icon="arrow"></span></span></a>
           <a class="feature" href="#/app/diagnose"><span class="fi" data-icon="file"></span><h3>差距诊断</h3><p>逐条对照岗位要求与简历，给出具备、部分具备、缺少三种结论，每条附简历原文依据。</p><span class="more">开始诊断<span data-icon="arrow"></span></span></a>
           <a class="feature" href="#/app/plan"><span class="fi" data-icon="calendar"></span><h3>30 天补差计划</h3><p>按每天 1～4 小时排出 30 天日历，包含学习日、复盘日、综合项目和面试日，可逐项打勾。</p><span class="more">生成计划<span data-icon="arrow"></span></span></a>
           <a class="feature" href="#/app/interview"><span class="fi" data-icon="mic"></span><h3>模拟面试</h3><p>围绕短板连续提问并追问细节，结束后按五个维度评分，给出改进建议和回答示范。</p><span class="more">开始面试<span data-icon="arrow"></span></span></a>
@@ -134,7 +134,7 @@
       <div class="container">
         <div class="sec-head">
           <h2>覆盖专业</h2>
-          <p>依据《职业教育专业目录（2021年）》，首批收录 14 个常见和热门的高职专业。</p>
+          <p>依据《职业教育专业目录（2021年）》，收录 19 个常见和热门的高职专业，覆盖人工智能、软件、游戏与数字媒体、智能制造、财经商贸等方向。</p>
         </div>
         <div class="major-table" id="homeMajors"></div>
       </div>
@@ -165,8 +165,9 @@
         <!-- 岗位库 -->
         <div class="pane" id="pane-jobs">
           <header class="pane-head">
-            <div><nav class="crumb" aria-label="当前位置">工作台<i>/</i>找岗位</nav><h1 class="page-title">找目标岗位</h1><p class="page-desc">按专业或岗位名检索。岗位要求来自高职院校公开的人才培养方案和 2025—2026 年公开招聘信息。</p></div>
-            <button class="btn btn-ghost btn-sm server-only" id="btnContribute" type="button"><span data-icon="upload"></span>贡献真实招聘</button>
+            <div><nav class="crumb" aria-label="当前位置">工作台<i>/</i>找岗位</nav><h1 class="page-title">找目标岗位</h1><p class="page-desc">按专业或岗位名检索；海投时点卡片上的“海投”把多个岗位加入组合，程序会统计它们的共同要求。</p></div>
+            <div class="pane-actions"><button class="btn btn-primary btn-sm" id="btnRecommend" type="button"><span data-icon="search"></span>按简历推荐岗位</button>
+            <button class="btn btn-ghost btn-sm server-only" id="btnContribute" type="button"><span data-icon="upload"></span>贡献真实招聘</button></div>
           </header>
           <div class="card toolbar">
           <form class="search" id="jobForm" role="search">
@@ -179,6 +180,7 @@
           <p class="job-meta" id="jobMeta"></p>
           <div class="job-grid" id="jobResults" aria-live="polite"></div>
           <p class="notice" id="jobNotice"></p>
+          <div class="pick-tray hidden" id="pickTray" aria-live="polite"></div>
         </div>
 
         <!-- 诊断 -->
@@ -267,23 +269,25 @@
         <h1 class="page-title big">职途助手是怎么工作的</h1>
         <div class="prose">
           <h3>1. 岗位库</h3>
-          <p>岗位库收录 14 个热门高职专业的典型岗位画像。每个岗位的要求由职途助手根据高职院校公开的 2025 级人才培养方案和 2025—2026 年公开招聘信息归纳整理，并附上来源链接；它们不是某家公司的真实招聘。同学提交的真实招聘信息会先隐藏个人信息，经管理员整理审核后入库，并标注“真实招聘”。证书名称和职业代码以官方最新发布为准。</p>
-          <h3>2. 诊断流程</h3>
+          <p>岗位库收录 19 个高职专业的典型岗位画像。每个岗位的要求由职途助手根据高职院校公开的 2025 级人才培养方案和 2025—2026 年公开招聘信息（猎聘、国家大学生就业服务平台、高校就业网转载等）归纳整理，并附上来源链接；它们不是某家公司的真实招聘。同学提交的真实招聘信息会先隐藏个人信息，经管理员整理审核后入库，并标注“真实招聘”。证书名称和职业代码以官方最新发布为准。</p>
+          <h3>2. 海投：共同要求统计</h3>
+          <p>在岗位库里把多个岗位加入“海投组合”后，程序按岗位要求里的关键词（如 Python、Excel、剪映、作品集）归并统计，算出每项要求出现在几个岗位里，按出现次数排序；诊断和 30 天计划会优先补覆盖岗位最多的要求。归并是按关键词做的近似统计，结果会列出每项要求来自哪些岗位，方便核对。</p>
+          <h3>3. 诊断流程</h3>
           <p>系统先在本地隐藏简历中的个人信息，再把简历和招聘信息交给大模型，让它拆解岗位要求、判断状态并引用简历原文。返回结果后，程序逐字核验每一条引用：原文在简历中找不到，就把该条从“具备”降为“部分具备”，并在页面上说明原因。匹配度由程序按统一规则计算（必需项权重为 2，加分项为 1）。</p>
-          <h3>3. 30 天计划</h3>
+          <h3>4. 30 天计划</h3>
           <p>大模型只负责设计学习模块（每个模块对应一项差距，写明要学会的软件和按顺序执行的小任务）；排期由程序完成：第 7、14、21、28 天复盘，第 26、27、29 天做综合项目，第 30 天更新简历并模拟面试，其余是学习日，每天的任务总时长不超过你设定的时间。</p>
-          <h3>4. 资料库</h3>
+          <h3>5. 资料库</h3>
           <p class="server-only">就业问答使用本地资料库检索（SQLite 全文索引），只把检索到的片段交给模型，并要求逐句标注编号；程序会删除不存在的引用编号。资料库中的每份文件都写明发布单位、日期和原文链接。</p>
           <p class="static-only">就业问答在浏览器里检索公开资料，只把相关片段发给所选模型，并要求逐句标注编号；程序会删除不存在的引用编号。每份资料都列出发布单位、日期和原文链接。</p>
-          <h3>5. 使用自己的 API Key</h3>
+          <h3>6. 使用自己的 API Key</h3>
           <p class="server-only">你可以在右上角填写自己的大模型 API Key（支持 DeepSeek、通义千问、智谱、Kimi 等）。Key 默认只保存在当前浏览器标签页，勾选“记住”才会保存在这台设备上；每次请求时随请求发送到职途助手服务器，只用来调用你选择的服务商，服务器不保存、不记录。费用由你的账户承担，建议在服务商后台设置额度上限。为防止服务器被滥用，只能选择列表中的服务商地址。</p>
           <p class="static-only">点击右上角的模型状态填写自己的 API Key。Key 只在当前页面内存中使用，刷新或离开页面后清除，不写入浏览器存储。请求直接发往设置中的 HTTPS 模型接口，费用由你的模型账户承担。连接能否成功也取决于服务商是否允许浏览器跨域访问。</p>
-          <h3>6. 隐私</h3>
+          <h3>7. 隐私</h3>
           <p class="server-only">手机号、身份证号、邮箱、QQ/微信号、住址在发送前被替换为“[已隐藏]”。服务器不保存简历和招聘信息原文，只记录功能使用次数、耗时和你主动提交的评分，用于改进工具。</p>
           <p class="static-only">手机号、身份证号、邮箱、QQ/微信号、住址在发送前会被遮盖。诊断结果（含遮盖后的引用）、计划、进度和使用记录保存在本机浏览器，不汇总其他访客的数据。可在「本机记录」页导出或清除；换设备或清除浏览器数据后无法查看。</p>
-          <h3>7. 诚信</h3>
+          <h3>8. 诚信</h3>
           <p>职途助手只帮你找差距、做计划、练表达，不会帮你编造经历、夸大成果或伪造证书。如果发现简历中的表述无法证实，会提醒你如实修改。</p>
-          <h3>8. 局限</h3>
+          <h3>9. 局限</h3>
           <p>诊断质量取决于所接入的大模型和招聘信息的完整程度，结果仅供参考。政策和学校信息请以官方最新发布为准，求职决定建议结合就业指导老师的意见。</p>
         </div>
         <a class="btn btn-primary" href="#/app/jobs">进入工作台</a>

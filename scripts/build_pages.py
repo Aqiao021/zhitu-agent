@@ -59,7 +59,7 @@ def build(output: Path, site_url: str = ""):
         for p in providers:
             if p["id"] == "deepseek":
                 p.update(base_url="https://api.deepseek.com/v1", model="deepseek-chat")
-        data = {"prompts": {k: getattr(prompts, k) for k in ("DIAGNOSE", "DIAGNOSE_JOB", "PLAN30", "INTERVIEW_Q", "INTERVIEW_END", "ASK")},
+        data = {"prompts": {k: getattr(prompts, k) for k in ("DIAGNOSE", "DIAGNOSE_JOB", "PLAN30", "INTERVIEW_Q", "INTERVIEW_END", "ASK", "RESUME_TIPS")},
                 "documents": kb.documents(), "chunks": [c.cite() for c in kb.chunks], "jobs": jobs, "providers": providers}
     finally:
         kb.db.close()

@@ -9,7 +9,7 @@ import time
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from zhitu import config as config_mod
 from zhitu.agent import Agent
@@ -126,8 +126,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/jobs":
             qs = parse_qs(urlparse(self.path).query)
             return self._json(200, {"results": JOBS.search(qs.get("q", [""])[0], qs.get("major", [""])[0])})
+        if path == "/api/jobs/common":
+            ids = parse_qs(urlparse(self.path).query).get("ids", [""])[0].split(",")
+            job = JOBS.combine(ids)
+            return self._json(200, job) if job else self._json(400, {"error": "请至少选择 2 个岗位"})
         if path.startswith("/api/jobs/"):
-            job = JOBS.get(path.rsplit("/", 1)[1])
+            job = JOBS.get(unquote(path.rsplit("/", 1)[1]))
             return self._json(200, job) if job else self._json(404, {"error": "没有找到这个岗位"})
         if path == "/api/admin/jobs":
             if not self._admin_ok():
@@ -171,7 +175,15 @@ class Handler(BaseHTTPRequestHandler):
             "/api/interview": lambda: agent.interview(body.get("diagnosis") or {}, body.get("history") or [],
                                                       body.get("rounds", 5)),
             "/api/ask": lambda: agent.ask(str(body.get("question", ""))),
+            "/api/resume_tips": lambda: agent.resume_tips(str(body.get("resume", "")), body.get("diagnosis") or {}),
         }
+        if path == "/api/recommend":
+            try:
+                result = AGENT.recommend(str(body.get("resume", "")))
+            except ModelError as e:
+                return self._json(400, {"error": str(e)})
+            STORE.event("recommend", True, 0, None, session, False)
+            return self._json(200, result)
         if path == "/api/key/test":
             if not ucfg:
                 return self._json(400, {"error": "请先填写 API Key"})

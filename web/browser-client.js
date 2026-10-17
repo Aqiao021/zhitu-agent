@@ -5,7 +5,7 @@
   const CATS = new Set(['专业技能', '软件工具', '证书', '项目经验', '通用素养']);
   const OLD_CATS = { '工具': '软件工具', '学历证书': '证书', '综合素质': '通用素养' };
   const WEIGHT = { '必需': 2, '加分': 1 };
-  const KINDS = new Set(['diagnose', 'plan', 'interview', 'ask']);
+  const KINDS = new Set(['diagnose', 'plan', 'interview', 'ask', 'resume_tips']);
   const clip = (s, n = 6000) => String(s ?? '').trim().slice(0, n);
   const list = x => Array.isArray(x) ? x : [];
   const norm = s => String(s ?? '').replace(/\s/g, '');
@@ -65,6 +65,54 @@
   function jobCard(job) {
     return { ...job, aliases: list(job.aliases).slice(0, 3), tools: list(job.tools).slice(0, 5),
       must: list(job.requirements).filter(r => r.level === '必需').length, total: list(job.requirements).length };
+  }
+  // Same keyword grouping rules as the Python service; all calculations stay on this device.
+  const SYNONYMS = {ps:'photoshop',pr:'premiere','premiere pro':'premiere',ae:'after effects','ai绘图':'aigc',u3d:'unity',unity3d:'unity','电工证':'低压电工','上岗证':'低压电工',office:'办公软件',word:'办公软件',ppt:'办公软件',wps:'办公软件',prompt:'提示词','提示词工程':'提示词','团队协作':'团队合作','协作':'团队合作','沟通协调':'沟通',k8s:'kubernetes',cad:'autocad',py:'python'};
+  const STOP_TAGS = new Set(['1+x','证书','专业','项目','实习','实训','经验','大专','专科','应届生','2026届','能力','项目经历','实习经历','计算机','相关专业']);
+  const tag = k => { k=clip(k).toLowerCase(); return SYNONYMS[k] || k; };
+  const unique = xs => [...new Set(xs)];
+  const lexical = (a,b) => a < b ? -1 : a > b ? 1 : 0;
+  function mentions(keyword, text) {
+    const k=clip(keyword).toLowerCase();
+    if (k.length<2) return false;
+    if (/^[a-z0-9.+#/-]{1,3}$/.test(k)) {
+      const escaped=k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      return new RegExp('(?<![a-z])'+escaped+'(?![a-z])').test(text);
+    }
+    return text.includes(k);
+  }
+  function combineJobs(all, ids) {
+    const jobs=unique(ids.map(String)).map(id=>all.find(j=>j.id===id)).filter(Boolean).slice(0,10);
+    if(jobs.length<2) throw new Error('请至少选择 2 个岗位');
+    const n=jobs.length, tags=new Map(), used=new Set(), groups=[];
+    for(const j of jobs) list(j.requirements).forEach((r,i)=>{
+      for(const t of unique(list(r.keywords).map(tag)).filter(t=>!STOP_TAGS.has(t))) {
+        if(!tags.has(t)) tags.set(t,[]); tags.get(t).push({j,i,r});
+      }
+    });
+    const jobCount=items=>new Set(items.map(x=>x.j.id)).size;
+    const order=[...tags.keys()].sort((a,b)=>jobCount(tags.get(b))-jobCount(tags.get(a)) || tags.get(b).filter(x=>x.r.level==='必需').length-tags.get(a).filter(x=>x.r.level==='必需').length || lexical(a,b));
+    for(const t of order) {
+      const first=new Map();
+      for(const x of tags.get(t)) if(!used.has(x.j.id+':'+x.i) && !first.has(x.j.id)) first.set(x.j.id,x);
+      if(first.size<2) continue;
+      const rows=[...first.values()], reqs=rows.map(x=>x.r);
+      for(const x of rows) used.add(x.j.id+':'+x.i);
+      const rep=[...reqs].sort((a,b)=>(a.level!=='必需')-(b.level!=='必需') || a.item.length-b.item.length)[0];
+      const cats=unique(reqs.map(r=>r.category)).sort((a,b)=>reqs.filter(r=>r.category===b).length-reqs.filter(r=>r.category===a).length);
+      groups.push({item:rep.item,category:cats[0],level:reqs.filter(r=>r.level==='必需').length*2>=reqs.length?'必需':'加分',
+        keywords:unique(reqs.flatMap(r=>list(r.keywords))).slice(0,12),count:first.size,tag:t,jobs:rows.map(x=>x.j.title),
+        variants:unique(reqs.map(r=>r.item).filter(x=>x!==rep.item)).slice(0,3)});
+    }
+    groups.sort((a,b)=>b.count-a.count || (a.level!=='必需')-(b.level!=='必需'));
+    const tools=new Map();
+    for(const j of jobs) for(const t of list(j.tools)) {if(!tools.has(t)) tools.set(t,new Set());tools.get(t).add(j.id);}
+    const ranked=[...tools].sort((a,b)=>b[1].size-a[1].size);
+    return {id:'combo:'+jobs.map(j=>j.id).sort().join(','),title:`海投组合（${n} 个岗位）`,kind:'组合',aliases:[],
+      majors:unique(jobs.flatMap(j=>list(j.majors))).slice(0,6),summary:'共同要求由程序统计：'+jobs.map(j=>j.title).join('、'),duties:[],
+      requirements:groups.slice(0,12),tools:ranked.slice(0,10).map(x=>x[0]),tool_counts:ranked.slice(0,16).map(([name,ids])=>({name,count:ids.size})),
+      certificates:unique(jobs.flatMap(j=>list(j.certificates))).slice(0,6),sources:jobs.flatMap(j=>list(j.sources).slice(0,1)).slice(0,6),city:'',education:'',
+      combo:{n,jobs:jobs.map(({id,title})=>({id,title})),shared:groups.filter(g=>g.count===n).length,groups:groups.length}};
   }
   function schedule(data, daily, diagnosis, gaps) {
     const modules = list(data.modules).slice(0, 10).filter(m => m && clip(m.skill)).map(m => ({
@@ -215,7 +263,10 @@
       if (url.pathname === '/api/majors') return { notice: library.notice || '', updated: library.updated || '', total_jobs: jobs.length,
         majors: list(library.majors).map(m => ({ ...m, count: jobs.filter(j => list(j.majors).includes(m.name)).length })) };
       if (url.pathname.startsWith('/api/jobs/')) {
-        const job = jobs.find(j => j.id === decodeURIComponent(url.pathname.slice('/api/jobs/'.length)));
+        const id = decodeURIComponent(url.pathname.slice('/api/jobs/'.length));
+        if (id === 'common') return combineJobs(jobs, (url.searchParams.get('ids') || '').split(','));
+        if (id.startsWith('combo:')) return combineJobs(jobs, id.slice(6).split(','));
+        const job = jobs.find(j => j.id === id);
         if (!job) throw new Error('岗位库里没有找到这个岗位，请重新选择');
         return structuredClone(job);
       }
@@ -233,7 +284,7 @@
           return { job: j, score };
         }).filter(x => !q || x.score >= Math.max(1.5, 0.5 * qt.size))
           .sort((a, b) => b.score - a.score || (a.job.kind !== '导入') - (b.job.kind !== '导入') || a.job.title.localeCompare(b.job.title, 'zh-CN'))
-          .slice(0, 40).map(x => jobCard(x.job));
+          .slice(0, 80).map(x => jobCard(x.job));
         return structuredClone({ results });
       }
       throw new Error('不支持的查询');
@@ -278,6 +329,7 @@
     }
     async request(path, body = {}) {
       const kind = path.split('/').pop();
+      if (kind === 'recommend') return this.recommend(body);
       if (kind === 'feedback') {
         if (!KINDS.has(body.kind) || !Number.isInteger(body.rating) || body.rating < 1 || body.rating > 5) throw new Error('请先选择 1～5 星评分');
         let comment = mask(clip(body.comment, 200)).text;
@@ -285,7 +337,7 @@
         this.records.add({ type: 'feedback', kind: body.kind, rating: body.rating, useful: typeof body.useful === 'boolean' ? body.useful : null, comment });
         return { ok: true };
       }
-      if (!KINDS.has(kind) && kind !== 'test') throw new Error('不支持的功能');
+      if (!KINDS.has(kind) && !['test', 'resume_tips'].includes(kind)) throw new Error('不支持的功能');
       if (!this.#settings) throw new Error('请先连接模型，填写你自己的 API Key');
       if (this.#controller) throw new Error('正在处理上一个请求，请等待完成后再试');
       const generation = this.#generation, start = Date.now();
@@ -296,10 +348,10 @@
         const result = kind === 'test' ? (await this.chat('这是连接测试，请只回复 OK。', 'OK', 8), { ok: true }) : await this[kind](body);
         if (generation !== this.#generation) throw new Error('请求已取消');
         const elapsed = Date.now() - start;
-        if (kind !== 'test') this.record({ type: 'event', kind, ok: true, ms: elapsed, score: result.match_score ?? null });
+        if (KINDS.has(kind) || kind === 'resume_tips') this.record({ type: 'event', kind, ok: true, ms: elapsed, score: result.match_score ?? null });
         return { ...result, elapsed_ms: elapsed, demo: false };
       } catch (error) {
-        if (kind !== 'test' && generation === this.#generation) this.record({ type: 'event', kind, ok: false, ms: Date.now() - start, score: null });
+        if ((KINDS.has(kind) || kind === 'resume_tips') && generation === this.#generation) this.record({ type: 'event', kind, ok: false, ms: Date.now() - start, score: null });
         if (generation !== this.#generation) throw new Error('请求已取消');
         if (this.#controller.signal.aborted) throw new Error(`等待超过 ${timeout / 1000} 秒，请稍后重试；服务商可能已处理本次请求`);
         if (error instanceof TypeError) throw new Error('无法连接模型接口，请检查网络、接口地址及服务商是否允许浏览器跨域访问');
@@ -312,8 +364,9 @@
       const job = job_id ? this.get('/api/jobs/' + encodeURIComponent(job_id)) : null;
       const masked = mask(resume), refs = this.search(job ? job.title + ' ' + list(job.tools).slice(0, 5).join(' ') : mask(jd).text, 3);
       const lines = job ? list(job.requirements).map((r, i) => {
-        const hits = list(r.keywords).filter(k => k && masked.text.toLowerCase().includes(k.toLowerCase())).slice(0, 6);
-        return `${i + 1}. [${r.level}·${r.category}] ${r.item}（简历中出现的相关词：${hits.join('、') || '无'}）`;
+        const hits = list(r.keywords).filter(k => k && mentions(k, masked.text.toLowerCase())).slice(0, 6);
+        const share = r.count && job.combo ? `·${r.count}/${job.combo.n}个岗位要求` : '';
+        return `${i + 1}. [${r.level}·${r.category}${share}] ${r.item}（简历中出现的相关词：${hits.join('、') || '无'}）`;
       }).join('\n') : '';
       const user = (job ? `【岗位】${job.title}：${job.summary}\n【岗位要求】\n${lines}` : `【招聘信息】\n${mask(jd).text}`)
         + `\n\n【简历】\n${masked.text}\n\n【参考资料】\n${refsText(refs) || '（无）'}`;
@@ -334,7 +387,7 @@
         if (evidence && !verified) { flagged++; evidence = ''; note = '模型给出的依据在简历中找不到原文，已降级处理'; }
         if (!evidence && status === '具备') { status = '部分具备'; note ||= '简历中没有找到明确依据'; }
         const category = OLD_CATS[r.category] || r.category;
-        return { item: clip(r.item, 80), category: CATS.has(category) ? category : '专业技能', level: Object.hasOwn(WEIGHT, r.level) ? r.level : '必需', status, evidence: evidence.slice(0, 200), verified, note, advice: clip(r.advice, 80) };
+        return { item: clip(r.item, 80), category: CATS.has(category) ? category : '专业技能', level: Object.hasOwn(WEIGHT, r.level) ? r.level : '必需', status, count: Number.isInteger(r.count) ? r.count : null, evidence: evidence.slice(0, 200), verified, note, advice: clip(r.advice, 80) };
       });
       if (!requirements.length) throw new Error('没有识别出岗位要求，请检查招聘信息后重试');
       const counts = Object.fromEntries(Object.keys(STATUS).map(s => [s, requirements.filter(r => r.status === s).length]));
@@ -342,18 +395,52 @@
       return { job_title: clip(data.job_title || '目标岗位', 40), summary: clip(data.summary, 300), requirements: requirements.sort((a, b) => STATUS[a.status] - STATUS[b.status] || WEIGHT[b.level] - WEIGHT[a.level]), counts, match_score: score,
         must_gaps: requirements.filter(r => r.level === '必需' && r.status === '缺少').length,
         strengths: strings(data.strengths, 3, 80), honesty_notes: strings(data.honesty_notes, 5, 120), standard_note: clip(data.standard_note, 200), references: refs, privacy: masked.counts, unverified_evidence: flagged,
-        source: job ? { type: 'job', id: job.id, kind: job.kind, sources: list(job.sources).slice(0, 3) } : { type: 'paste' },
+        source: job ? { type: 'job', id: job.id, kind: job.kind, sources: list(job.sources).slice(0, 3), ...(job.combo ? {combo:job.combo} : {}) } : { type: 'paste' },
         ...(job ? { job: { id: job.id, title: job.title, tools: job.tools, certificates: job.certificates } } : {}) };
     }
     async plan({ diagnosis, daily_hours }) {
       const daily = clamp(Math.round(number(daily_hours, 2) * 2) / 2, 1, 4) * 60;
       const rank = { '必需缺少': 0, '必需部分具备': 1, '加分缺少': 2, '加分部分具备': 3 };
-      const gaps = list(diagnosis?.requirements).filter(r => r.status !== '具备').map(({ item, category, level = '必需', status, advice }) => ({ item, category, level, status, advice }))
-        .sort((a, b) => (rank[a.level + a.status] ?? 4) - (rank[b.level + b.status] ?? 4));
+      const gaps = list(diagnosis?.requirements).filter(r => r.status !== '具备').map(({ item, category, level = '必需', status, advice, count }) => ({ item, category, level, status, advice, count }))
+        .sort((a, b) => (rank[a.level + a.status] ?? 4) - (rank[b.level + b.status] ?? 4) || (b.count || 0) - (a.count || 0));
       if (!gaps.length) throw new Error('请先完成一次包含待补差距的诊断');
       const brief = JSON.stringify({ job_title: diagnosis.job_title, job_tools: list(diagnosis.job?.tools).slice(0, 12), gaps: gaps.slice(0, 10) });
       const data = extractJSON(await this.chat(this.data.prompts.PLAN30, `每天可用时间：${daily} 分钟\n学习日共 22 天，学习日总时长约 ${daily * 22} 分钟\n差距诊断：${brief}`, 4000));
       return schedule(data, daily, diagnosis, gaps);
+    }
+    recommend({resume}) {
+      resume=clip(resume); if(norm(resume).length<30) throw new Error('简历至少 30 字，才能推荐岗位');
+      const masked=mask(resume),low=masked.text.toLowerCase();
+      const results=list(this.data.jobs?.jobs).map(j=>{
+        let total=0,hit=0;const hits=[],missing=[];
+        for(const r of list(j.requirements)) {
+          const weight=r.level==='必需'?2:1;total+=weight;
+          const found=list(r.keywords).filter(k=>mentions(k,low));
+          if(found.length){hit+=weight;hits.push(...found.slice(0,2));}else if(r.level==='必需') missing.push(r.item);
+        }
+        return {...jobCard(j),score:total?Math.round(100*hit/total):0,major_hit:list(j.majors).find(m=>masked.text.includes(m)) || '',hits:unique(hits).slice(0,8),missing:missing.slice(0,3)};
+      }).sort((a,b)=>(b.score+(b.major_hit?8:0))-(a.score+(a.major_hit?8:0)) || lexical(a.title,b.title)).slice(0,8);
+      return {results,privacy:masked.counts,method:'按简历中出现的岗位关键词粗略匹配（必需项权重 2、加分项 1），只用于挑选候选岗位，准确对照请做差距诊断'};
+    }
+    async resume_tips({resume,diagnosis}) {
+      resume=clip(resume);if(norm(resume).length<30) throw new Error('请先在诊断页填写简历（至少 30 字）');
+      const reqs=list(diagnosis?.requirements).filter(r=>r && typeof r==='object').slice(0,15);
+      if(!reqs.length) throw new Error('请先完成一次差距诊断');
+      const masked=mask(resume).text;
+      const brief=mask(JSON.stringify({job_title:diagnosis.job_title,requirements:reqs.map(({item,status,level,evidence})=>({item,status,level,evidence}))})).text;
+      const data=extractJSON(await this.chat(this.data.prompts.RESUME_TIPS,`【目标岗位与诊断】\n${brief}\n\n【简历】\n${masked}`,2500));
+      const numbers=new Set(masked.match(/\d+(?:\.\d+)?/g)||[]),rewrites=[];let dropped=0;
+      for(const t of list(data.rewrites).slice(0,8)) {
+        if(!t || typeof t!=='object')continue;
+        const original=clip(t.original),rewrite=clip(t.rewrite);
+        if(!original || !rewrite || !norm(masked).includes(norm(original))){dropped++;continue;}
+        let blanks=false;
+        const checked=rewrite.replace(/\d+(?:\.\d+)?/g,n=>{if(numbers.has(n))return n;blanks=true;return '（填写真实数字）';});
+        rewrites.push({original:original.slice(0,200),rewrite:checked.slice(0,260),requirement:clip(t.requirement,80),why:clip(t.why,100),blanks});
+      }
+      const questions=strings(data.questions,5,100).filter(Boolean);
+      if(!rewrites.length && !questions.length)throw new Error('没有生成可用的建议，请重试');
+      return {rewrites,questions,dropped,note:'改写只调整表达方式，不添加简历里没有的经历；括号里的空需要你按真实情况填写。'};
     }
     async interview({ diagnosis, history, rounds }) {
       if (!diagnosis) throw new Error('请先完成一次诊断');

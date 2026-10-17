@@ -5,7 +5,7 @@ import re
 import time
 
 from . import prompts
-from .jobs import CATS, JobDB, normalize
+from .jobs import CATS, JobDB, mentions, normalize
 from .kb import KnowledgeBase
 from .llm import ModelError, extract_json
 from .privacy import mask
@@ -34,7 +34,7 @@ def _refs(chunks) -> str:
 
 def keyword_hits(req: dict, resume: str) -> list[str]:
     low = resume.lower()
-    return [k for k in req.get("keywords", []) if k and k.lower() in low][:6]
+    return [k for k in req.get("keywords", []) if k and mentions(k, low)][:6]
 
 
 class Agent:
@@ -68,7 +68,8 @@ class Agent:
         lines = []
         for i, r in enumerate(reqs):
             hits = keyword_hits(r, resume_m)
-            lines.append(f"{i + 1}. [{r['level']}·{r['category']}] {r['item']}（简历中出现的相关词：{'、'.join(hits) or '无'}）")
+            share = f"·{r['count']}/{job['combo']['n']}个岗位要求" if r.get("count") and job.get("combo") else ""
+            lines.append(f"{i + 1}. [{r['level']}·{r['category']}{share}] {r['item']}（简历中出现的相关词：{'、'.join(hits) or '无'}）")
         refs = self.kb.search(job["title"] + " " + " ".join(job["tools"][:5]), 3)
         user = (f"【岗位】{job['title']}：{job['summary']}\n【岗位要求】\n" + "\n".join(lines) +
                 f"\n\n【简历】\n{resume_m}\n\n【参考资料】\n{_refs(refs) or '（无）'}")
@@ -82,13 +83,15 @@ class Agent:
         merged = []
         for i, r in enumerate(reqs):
             got = by_n.get(i + 1, {})
-            merged.append({"item": r["item"], "category": r["category"], "level": r["level"],
+            merged.append({"item": r["item"], "category": r["category"], "level": r["level"], "count": r.get("count"),
                            "status": got.get("status", "缺少"), "evidence": got.get("evidence", ""),
                            "advice": got.get("advice", "") or "先补这一项的基础，再做一个能展示的小练习"})
         data["requirements"] = merged
         data["job_title"] = job["title"]
         out = self.verify_diagnosis(data, resume_m, refs, hidden, fixed=True)
         out["source"] = {"type": "job", "id": job["id"], "kind": job["kind"], "sources": job["sources"][:3]}
+        if job.get("combo"):
+            out["source"]["combo"] = job["combo"]
         out["job"] = {"id": job["id"], "title": job["title"], "tools": job["tools"],
                       "certificates": job["certificates"]}
         return out
@@ -118,6 +121,7 @@ class Agent:
             reqs.append({"item": str(r["item"]).strip()[:80], "category": cat if cat in CATS else "专业技能",
                          "level": r.get("level") if r.get("level") in WEIGHT else "必需",
                          "status": status, "evidence": evidence[:200], "verified": verified, "note": note,
+                         "count": r["count"] if isinstance(r.get("count"), int) else None,
                          "advice": str(r.get("advice", "")).strip()[:80]})
         if not reqs:
             raise ModelError("没有从招聘信息里识别出岗位要求，请检查粘贴的内容")
@@ -150,12 +154,12 @@ class Agent:
         if not gaps:
             raise ModelError("诊断里没有需要补的项，可以直接准备投递和面试")
         rank = {("必需", "缺少"): 0, ("必需", "部分具备"): 1, ("加分", "缺少"): 2, ("加分", "部分具备"): 3}
-        gaps.sort(key=lambda g: rank.get((g.get("level", "必需"), g.get("status")), 4))
+        gaps.sort(key=lambda g: (rank.get((g.get("level", "必需"), g.get("status")), 4), -(g.get("count") or 0)))
         job = diagnosis.get("job") or {}
         learn_days = [d for d in range(1, 31) if d not in REVIEW_DAYS + PROJECT_DAYS + (INTERVIEW_DAY,)]
         brief = json.dumps({"job_title": diagnosis.get("job_title"),
                             "job_tools": job.get("tools", [])[:12],
-                            "gaps": [{k: g.get(k) for k in ("item", "category", "level", "status", "advice")}
+                            "gaps": [{k: g.get(k) for k in ("item", "category", "level", "status", "advice", "count")}
                                      for g in gaps[:10]]}, ensure_ascii=False)
         user = (f"每天可用时间：{daily} 分钟\n学习日共 {len(learn_days)} 天，学习日总时长约 {daily * len(learn_days)} 分钟\n"
                 f"差距诊断：{brief}")
@@ -265,6 +269,50 @@ class Agent:
                 "project": project, "unscheduled": [t["title"] for t in queue][:20],
                 "tips": [str(s)[:80] for s in (data.get("tips") or [])][:3],
                 "job_title": diagnosis.get("job_title", ""), "created": time.strftime("%Y-%m-%d")}
+
+    # ---------------------------------------------------------------- recommend & resume tips
+    def recommend(self, resume: str) -> dict:
+        resume = _clip(resume)
+        if len(_norm(resume)) < 30:
+            raise ModelError("简历至少 30 字，才能推荐岗位")
+        resume_m, hidden = mask(resume)
+        return {"results": self.jobs.recommend(resume_m) if self.jobs else [], "privacy": hidden,
+                "method": "按简历中出现的岗位关键词粗略匹配（必需项权重 2、加分项 1），只用于挑选候选岗位，准确对照请做差距诊断"}
+
+    def resume_tips(self, resume: str, diagnosis: dict) -> dict:
+        """Rewrite resume lines so they show the evidence more clearly; never add facts that are not in the resume."""
+        resume = _clip(resume)
+        if len(_norm(resume)) < 30:
+            raise ModelError("请先在诊断页填写简历（至少 30 字）")
+        resume_m, _ = mask(resume)
+        reqs = [r for r in (diagnosis.get("requirements") or []) if isinstance(r, dict)][:15]
+        if not reqs:
+            raise ModelError("请先完成一次差距诊断")
+        brief = json.dumps({"job_title": diagnosis.get("job_title"),
+                            "requirements": [{k: r.get(k) for k in ("item", "status", "level", "evidence")} for r in reqs]},
+                           ensure_ascii=False)
+        user = f"【目标岗位与诊断】\n{brief}\n\n【简历】\n{resume_m}"
+        data = extract_json(self.llm.chat(prompts.RESUME_TIPS, [{"role": "user", "content": user}], 2500))
+        norm_resume = _norm(resume_m)
+        nums_in_resume = set(re.findall(r"\d+(?:\.\d+)?", resume_m))
+        tips, dropped = [], 0
+        for t in (data.get("rewrites") or [])[:8]:
+            if not isinstance(t, dict):
+                continue
+            orig, new = str(t.get("original", "")).strip(), str(t.get("rewrite", "")).strip()
+            if not orig or not new or _norm(orig) not in norm_resume:
+                dropped += 1  # the "original" must be copied from the resume
+                continue
+            invented = [n for n in re.findall(r"\d+(?:\.\d+)?", new) if n not in nums_in_resume]
+            for n in invented:  # numbers the student never wrote become blanks to fill in honestly
+                new = re.sub(r"(?<![\d.])" + re.escape(n) + r"(?![\d.])", "（填写真实数字）", new)
+            tips.append({"original": orig[:200], "rewrite": new[:260], "requirement": str(t.get("requirement", ""))[:80],
+                         "why": str(t.get("why", ""))[:100], "blanks": bool(invented)})
+        asks = [str(q)[:100] for q in (data.get("questions") or []) if str(q).strip()][:5]
+        if not tips and not asks:
+            raise ModelError("没有生成可用的建议，请重试")
+        return {"rewrites": tips, "questions": asks, "dropped": dropped,
+                "note": "改写只调整表达方式，不添加简历里没有的经历；括号里的空需要你按真实情况填写。"}
 
     # ---------------------------------------------------------------- import a real posting
     def extract_job(self, text: str, url: str = "") -> dict:

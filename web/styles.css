@@ -685,6 +685,82 @@ body.in-app .nav-cta { display: none; }
 .spec.hist td:last-child { white-space: nowrap; }
 @media (max-width: 767px) { .side-item::before { left: 8px; right: 8px; top: auto; bottom: -6px; width: auto; height: 2px; transform: scaleX(0); } .side-item.active::before { transform: scaleX(1); } }
 
+/* wide-applying combo */
+.tag-combo { background: #F5E8FF; color: #722ED1; }
+.jc-tags { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.pick-btn { display: inline-flex; align-items: center; gap: 2px; height: 22px; padding: 0 8px 0 6px; border: 1px solid var(--line); border-radius: 2px; background: #fff; font-size: 12px; color: var(--text-2); cursor: pointer; }
+.pick-btn svg { width: 12px; height: 12px; }
+.pick-btn:hover { border-color: var(--primary-hover); color: var(--primary); }
+.job-card.in-pick { border-color: var(--primary-2); background: #FAFCFF; }
+.job-card.in-pick .pick-btn { background: var(--primary); border-color: var(--primary); color: #fff; }
+.job-meta { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.job-meta .linkish { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+.job-meta .linkish [data-icon] { width: 14px; height: 14px; }
+.pick-tray { position: sticky; bottom: 16px; z-index: 20; margin-top: 16px; }
+.tray-inner { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: #fff; border: 1px solid var(--primary-2); border-radius: var(--r-lg); box-shadow: var(--shadow-3); animation: itemIn .25s ease both; }
+.tray-count { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 13px; }
+.tray-count [data-icon] { color: var(--primary); }
+.tray-list { flex: 1; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.tray-chip { display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 4px 0 8px; border-radius: 2px; background: var(--bg-3); font-size: 12px; white-space: nowrap; }
+.tray-chip button { width: 18px; height: 18px; border: 0; background: none; padding: 3px; cursor: pointer; color: var(--text-3); }
+.tray-chip button:hover { color: var(--miss); }
+.tray-actions { display: flex; gap: 8px; }
+.combo-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.combo-kpis > div { padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--r); }
+.combo-kpis b { display: block; font-size: 24px; font-weight: 600; }
+.combo-kpis span { font-size: 12px; color: var(--text-3); }
+.common-list { list-style: none; margin: 0; padding: 0; }
+.common-list li { padding: 10px 0; border-top: 1px solid var(--line-2); }
+.common-list li:first-child { border-top: 0; }
+.cl-top { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
+.cl-top b { font-weight: 500; }
+.cl-top .lvl { flex: none; margin-top: 1px; }
+.cl-bar { display: flex; align-items: center; gap: 8px; margin: 6px 0 4px; }
+.cl-bar i { display: block; height: 6px; border-radius: 3px; background: var(--primary); min-width: 6px; }
+.cl-bar span { font-size: 12px; color: var(--primary); white-space: nowrap; }
+.common-list small { font-size: 12px; color: var(--text-3); }
+.tool-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.tool-bars li { display: grid; grid-template-columns: 110px 1fr 24px; align-items: center; gap: 8px; font-size: 13px; }
+.tool-bars li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool-bars li i { display: block; height: 8px; border-radius: 2px; background: var(--primary-2); }
+.tool-bars li b { text-align: right; font-weight: 600; }
+.share { display: inline-flex; margin-left: 6px; height: 18px; align-items: center; padding: 0 6px; border-radius: 2px; background: #F5E8FF; color: #722ED1; font-size: 11px; font-weight: 400; white-space: nowrap; vertical-align: 1px; }
+@media (max-width: 767px) {
+  .tray-inner { flex-wrap: wrap; gap: 8px; }
+  .tray-list { order: 3; flex-basis: 100%; }
+  .tray-actions { margin-left: auto; }
+  .pick-tray { bottom: 8px; }
+}
+
+/* recommend & resume tips */
+.rec-list { list-style: none; margin: 0; padding: 0; }
+.rec-list li { padding: 12px 0; border-top: 1px solid var(--line-2); display: grid; gap: 6px; }
+.rec-list li:first-child { border-top: 0; }
+.rec-top { display: flex; align-items: center; gap: 8px; }
+.rec-top b { flex: 1; font-weight: 600; font-size: 14px; }
+.rec-no { width: 20px; height: 20px; border-radius: 50%; background: var(--primary-1); color: var(--primary); display: grid; place-items: center; font-size: 12px; font-weight: 600; flex: none; }
+.rec-score { font-size: 18px; font-weight: 600; color: var(--primary); }
+.rec-score small { font-size: 12px; }
+.rec-miss { font-size: 12px; color: var(--miss-ink); }
+.card-head.flat { padding: 0 0 4px; border: 0; align-items: flex-start; }
+.card-head.flat p { margin: 4px 0 0; }
+.tips-card #tipsResult:not(:empty) { margin-top: 12px; }
+.tips-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.tips-list li { border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: grid; gap: 8px; }
+.tl-req { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-3); }
+.tl-req [data-icon] { width: 13px; height: 13px; }
+.tl-row { display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: start; }
+.tl-row p { margin: 0; font-size: 13px; color: var(--text-2); }
+.tl-row.new p { color: var(--text-1); }
+.tl-tag { font-size: 12px; height: 20px; line-height: 20px; text-align: center; border-radius: 2px; background: var(--bg-3); color: var(--text-3); }
+.tl-row.new .tl-tag { background: var(--have-bg); color: var(--have-ink); }
+.tl-row .icon-btn { width: 28px; height: 28px; padding: 6px; }
+.tips-list small { font-size: 12px; color: var(--text-3); }
+mark { background: var(--part-bg); color: var(--part-ink); padding: 0 2px; border-radius: 2px; }
+#pane-jobs .pane-actions { align-self: flex-end; }
+.tips-card h4 { display: flex; align-items: center; gap: 6px; font-size: 14px; margin: 16px 0 8px; }
+.tips-card h4 [data-icon] { color: var(--primary); }
+
 /* Python service and GitHub Pages editions. */
 html:not([data-mode="static"]) .static-only { display: none !important; }
 html[data-mode="static"] .server-only, [hidden] { display: none !important; }

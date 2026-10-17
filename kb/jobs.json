@@ -1,7 +1,7 @@
 {
  "version": "2026.10",
  "updated": "2026-10-17",
- "notice": "岗位画像由职途助手根据各高职院校公开的2025级人才培养方案和2025—2026年公开招聘信息归纳整理，不代表某家公司的真实招聘。证书名称、评价机构和职业代码以官方最新发布为准；部分招聘来源要求本科，只用于归纳技能要求。",
+ "notice": "岗位画像由职途助手根据各高职院校公开的2025级人才培养方案、国家大学生就业服务平台和2025—2026年公开招聘信息归纳整理，不代表某家公司的真实招聘。证书名称、评价机构和职业代码以官方最新发布为准；部分招聘来源要求本科，只用于归纳技能要求。",
  "majors": [
   {
    "name": "人工智能技术应用",
@@ -229,6 +229,63 @@
    ]
   },
   {
+   "name": "虚拟现实技术应用",
+   "code": "510208",
+   "category": "电子与信息大类（51）/计算机类（5102）",
+   "occupations": [
+    "虚拟现实产品设计师（4-04-05-11）",
+    "虚拟现实工程技术人员（2-02-38-07；岳阳现代服务职院方案写作 2-02-10-14，两校写法不一致）",
+    "数字孪生应用技术员（4-04-05-10）",
+    "数字媒体艺术专业人员（2-09-06-07）"
+   ],
+   "job_ids": [
+    "game_client_developer_junior",
+    "game_3d_artist_assistant"
+   ],
+   "sources": [
+    {
+     "title": "福州软件职业技术学院（fzrjxy.com）-2025级虚拟现实技术应用专业人才培养方案（职业面向：三维模型设计师、VR引擎开发人员、角色动作设计师；证书：VR/AR引擎开发设计师、1+X虚拟现实应用设计与制作（中级））",
+     "url": "https://www.fzrjxy.com/files/20250930/68db3493bbd3e.pdf",
+     "date": "2025-09"
+    },
+    {
+     "title": "岳阳现代服务职业学院-2025级虚拟现实技术应用专业人才培养方案（岗位：3D模型设计师、Unity开发工程师等；证书：图形图像应用技术Photoshop/3ds MAX职业技能等级证书、1+X虚拟现实应用开发；核心软件：C#/Visual Studio、Unity、3ds Max、Maya、ZBrush、Axure、Illustrator、Photoshop）",
+     "url": "https://www.yyxdfwzy.com/uploads/1/file/public/202509/20250917175450_rr60ekybkf.pdf",
+     "date": "2025-09"
+    },
+    {
+     "title": "辽宁建筑职业学院-虚拟现实技术应用专业人才培养方案（2025级）（核心课：面向对象程序设计、三维建模技术、虚拟现实引擎U3D、游戏开发技术；软件：Photoshop、3ds Max、Unity、C#、C4D）",
+     "url": "https://www.lnjzxy.edu.cn/FileUploads/www/site/2025/12/06/ZZXL6LIR09044NGVKM.pdf",
+     "date": "2025-12"
+    }
+   ]
+  },
+  {
+   "name": "动漫制作技术",
+   "code": "510215",
+   "category": "电子与信息大类（51）/计算机类（5102）",
+   "occupations": [
+    "动画设计人员（2-09-06-03）",
+    "动画制作员（4-13-02-02）"
+   ],
+   "job_ids": [
+    "game_3d_artist_assistant",
+    "aigc_content_creator"
+   ],
+   "sources": [
+    {
+     "title": "嵩山少林武术职业学院-2025年动漫制作技术专业人才培养方案（岗位群：动漫项目策划、二维动漫创作、三维动画创作、动画特效设计；证书：数字创意建模、动画制作（初级，腾讯）、1+X界面设计（初级，腾讯）、游戏美术设计、数字影视特效制作；软件：Photoshop、Illustrator、Animate、Maya、Premiere、After Effects、Spine）",
+     "url": "https://www.shaolinkungfu.edu.cn/ueditor/php/upload/file/20251218/1766022464969072.pdf",
+     "date": "2025-12"
+    },
+    {
+     "title": "福州软件职业技术学院（fzrjxy.com）-2025级动漫制作技术专业人才培养方案（岗位类别：影视动画制作、游戏资源制作、影视后期制作；证书：游戏美术设计职业技能等级证书（中级）、动画制作员）",
+     "url": "https://www.fzrjxy.com/files/20250930/68db329920fdf.pdf",
+     "date": "2025-09"
+    }
+   ]
+  },
+  {
    "name": "工业机器人技术",
    "code": "460305",
    "category": "装备制造大类(46)/自动化类(4603)",
@@ -380,6 +437,83 @@
      "title": "厦门兴才职业技术学院2025级电子商务专业人才培养方案",
      "url": "https://jw.xmxc.com/attachment/sites/item/2025_08/31_13/6588a2a2f6e1f668.pdf",
      "date": "2025-08"
+    }
+   ]
+  },
+  {
+   "name": "网络营销与直播电商",
+   "code": "530704",
+   "category": "财经商贸大类（53）/电子商务类（5307）",
+   "occupations": [
+    "市场营销专业人员（2-06-07-02）",
+    "品牌专业人员（2-06-07-04）",
+    "互联网营销师（4-01-02-07，该校方案写法）",
+    "全媒体运营师（4-13-05-03，该校方案写法）"
+   ],
+   "job_ids": [
+    "short_video_content_planner",
+    "marketing_event_planner"
+   ],
+   "sources": [
+    {
+     "title": "广西现代职业技术学院（据域名gxxd.net.cn推断，文件内未署校名）-2025级网络营销与直播电商专业人才培养方案（主要岗位含内容策划主管、市场策划主管、新媒体运营主管、直播运营主管；证书：直播电商1+X（中级）、自媒体运营1+X（中级）、电子商务师、互联网营销师，未注明颁发机构；软件：Word/Excel/PowerPoint、Photoshop、Premiere）",
+     "url": "https://jwkyc.gxxd.net.cn/Upload/jwkyc/ContentManage/Article/File/2025/08/21/202508212255453945.pdf",
+     "date": "2025-08"
+    },
+    {
+     "title": "福州软件职业技术学院（据域名推断）-网络营销与直播电商专业人才培养方案（适用2025级，代码530704，文档落款2024年7月；职业：互联网营销师写作4-01-06-02、全媒体运营师写作4-13-01-05）",
+     "url": "https://www.fzrjxy.com/files/20250919/68ccc5a599eb7.pdf",
+     "date": "2025-09"
+    }
+   ]
+  },
+  {
+   "name": "市场营销",
+   "code": "530605",
+   "category": "财经商贸大类（53）/工商管理类（5306）",
+   "occupations": [
+    "市场营销专业人员（2-06-07-02）",
+    "品牌专业人员（2-06-07-04）",
+    "互联网营销师（4-01-06-02，该校方案写法）",
+    "客户服务管理员（4-07-02-03）"
+   ],
+   "job_ids": [
+    "marketing_event_planner",
+    "short_video_content_planner",
+    "product_assistant"
+   ],
+   "sources": [
+    {
+     "title": "河南林业职业学院-2025级市场营销专业人才培养方案（主要岗位：市场策划主管、市场推广主管等；证书：电子商务数据分析与应用（中级，北京博导前程信息技术股份有限公司，必考）、数字营销技术应用职业技能等级证书（中级，中教畅享（北京）科技有限公司，选考）；软件：办公软件、商务数据分析软件、Photoshop、Lightroom、短视频剪辑软件）",
+     "url": "https://hnfvc.edu.cn/Upload/jw/pdf/2025/12/18/451fc268192048d58af5a6728a0b73f4/2025级市场营销专业人才培养方案.pdf",
+     "date": "2025-08"
+    }
+   ]
+  },
+  {
+   "name": "视觉传达设计",
+   "code": "550102",
+   "category": "文化艺术大类（55）/艺术设计类（5501）",
+   "occupations": [
+    "工艺美术与创意设计专业人员（2-09-06）",
+    "专业化设计服务人员（4-08-08）",
+    "视觉传达设计人员（2-09-06-01，福州软件职业技术学院方案写法）"
+   ],
+   "job_ids": [
+    "ui_designer_junior",
+    "marketing_event_planner",
+    "short_video_content_planner"
+   ],
+   "sources": [
+    {
+     "title": "河南林业职业学院-2025级视觉传达设计专业人才培养方案（主要岗位：平面设计师、广告策划师、包装设计师、新媒体设计、美术编辑；证书：UI视觉设计师（初级，方案写明颁发单位为腾讯云计算（北京）有限责任公司，必考）、新媒体运营职业技能等级证书（初级，河南省职业技能鉴定中心，选考）；软件：Photoshop、Illustrator、CorelDRAW、C4D、Midjourney、Premiere Pro、After Effects、剪映；未提Figma）",
+     "url": "https://hnfvc.edu.cn/Upload/jw/pdf/2025/12/18/1a9bde99dd9f4e38987297a76b0ea9d1/2025级视觉传达设计专业人才培养方案.pdf",
+     "date": "2025-08"
+    },
+    {
+     "title": "福州软件职业技术学院（据域名推断）-2025级视觉传达设计专业人才培养方案（代码550102；证书含Adobe中国认证设计师ACCD等）",
+     "url": "https://www.fzrjxy.com/files/20250929/68da4dd85bc77.pdf",
+     "date": "2025-07"
     }
    ]
   },
@@ -2205,7 +2339,8 @@
     "直播电商运营"
    ],
    "majors": [
-    "电子商务"
+    "电子商务",
+    "网络营销与直播电商"
    ],
    "summary": "负责抖音等平台直播间的日常运营，配合主播完成直播，并用直播数据优化效果。",
    "duties": [
@@ -2345,7 +2480,8 @@
    ],
    "majors": [
     "电子商务",
-    "数字媒体技术"
+    "数字媒体技术",
+    "网络营销与直播电商"
    ],
    "summary": "运营小红书、抖音、公众号等账号，制作并发布图文和短视频，为品牌或业务引流。",
    "duties": [
@@ -2635,7 +2771,8 @@
     "剪辑包装"
    ],
    "majors": [
-    "数字媒体技术"
+    "数字媒体技术",
+    "动漫制作技术"
    ],
    "summary": "负责宣传片、短视频等的剪辑、包装和特效合成，交付成片。",
    "duties": [
@@ -5987,6 +6124,1706 @@
      "title": "永州职业技术学院云计算技术应用专业人才培养方案（2025级）",
      "url": "https://www.yongzhouzhiyuan.cn/__local/0/08/48/4FB41E37D365BB615247378E2F6_C6D41F7D_18EE92.pdf",
      "date": "2025"
+    }
+   ],
+   "kind": "画像"
+  },
+  {
+   "id": "game_planner_assistant",
+   "title": "游戏策划助理（系统/关卡/活动策划方向）",
+   "aliases": [
+    "游戏执行策划",
+    "游戏策划",
+    "关卡策划",
+    "系统策划助理",
+    "游戏策划培训生"
+   ],
+   "majors": [
+    "数字媒体技术",
+    "软件技术"
+   ],
+   "summary": "在主策划指导下撰写玩法、关卡、系统策划文档，整理配置游戏资源与数值，并跟进程序、美术实现与测试。",
+   "duties": [
+    "参与游戏规则、玩法、关卡、道具等设计讨论，撰写和维护各模块策划文档",
+    "对游戏资源进行整理、配置和维护，使用内部编辑器或Unity编辑场景、绑定功能与文本",
+    "参与数值模块的建模、演算与调整（关卡难度、产出消耗等）",
+    "与程序、美术协作推进开发，参与游戏测试并提出优化需求",
+    "关注竞品与行业动态，收集玩家反馈与数据，完成市场调研/分析报告"
+   ],
+   "requirements": [
+    {
+     "item": "能独立撰写游戏玩法/关卡/系统策划案或游戏拆解分析文档",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "策划案",
+      "玩法设计",
+      "关卡设计",
+      "系统策划",
+      "游戏拆解"
+     ]
+    },
+    {
+     "item": "游戏经历丰富，能说清熟悉品类（如休闲、沙盒、MMO）的系统与数值特点",
+     "category": "通用素养",
+     "level": "必需",
+     "keywords": [
+      "游戏经历",
+      "竞品分析",
+      "休闲游戏",
+      "游戏品类"
+     ]
+    },
+    {
+     "item": "熟练使用Excel、Word、PPT等办公软件（配置表、文档、汇报）",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "Excel",
+      "Word",
+      "PPT",
+      "配置表"
+     ]
+    },
+    {
+     "item": "具备较好的逻辑思维与数据敏感度，能做基础数值演算",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "逻辑思维",
+      "数值",
+      "数据分析",
+      "公式"
+     ]
+    },
+    {
+     "item": "沟通协调与团队合作能力，能与程序、美术配合推进",
+     "category": "通用素养",
+     "level": "必需",
+     "keywords": [
+      "沟通",
+      "团队协作",
+      "跨部门",
+      "执行力"
+     ]
+    },
+    {
+     "item": "了解游戏开发流程，接触过Unity等引擎/编辑器",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "Unity",
+      "游戏引擎",
+      "编辑器",
+      "开发流程"
+     ]
+    },
+    {
+     "item": "会用Axure、墨刀等原型工具绘制界面/流程",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "Axure",
+      "墨刀",
+      "原型",
+      "流程图"
+     ]
+    },
+    {
+     "item": "有一定美术审美，会用Photoshop或AI制图工具",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "Photoshop",
+      "AI绘图",
+      "审美"
+     ]
+    },
+    {
+     "item": "有游戏作品、关卡Demo、Game Jam或游戏分析文章可展示",
+     "category": "项目经验",
+     "level": "加分",
+     "keywords": [
+      "作品集",
+      "Demo",
+      "Game Jam",
+      "游戏分析"
+     ]
+    },
+    {
+     "item": "2026届应届或可长期实习",
+     "category": "通用素养",
+     "level": "加分",
+     "keywords": [
+      "应届生",
+      "实习",
+      "2026届"
+     ]
+    }
+   ],
+   "tools": [
+    "Excel",
+    "Word",
+    "PPT",
+    "Unity",
+    "Photoshop",
+    "Axure",
+    "墨刀"
+   ],
+   "certificates": [],
+   "sources": [
+    {
+     "title": "上海爱扑网络科技股份有限公司-游戏执行策划（牛企直聘转载，专科）",
+     "url": "https://campus.niuqizp.com/job-vmy55CMnC.html",
+     "date": "2025-10"
+    },
+    {
+     "title": "宜兴派乐地互娱文化有限公司-游戏策划师（猎聘，全日制专科以上）",
+     "url": "https://www.liepin.com/job/1953946441.shtml",
+     "date": "2025-10"
+    },
+    {
+     "title": "多益网络有限公司-游戏策划助理（牛企直聘转载，本科）",
+     "url": "https://campus.niuqizp.com/job-vry5tLL5Z.html",
+     "date": "2025-12"
+    },
+    {
+     "title": "杭州同趣科技有限公司-游戏策划（牛企直聘转载，页面头部不限、正文本科及以上）",
+     "url": "https://campus.niuqizp.com/job-vUk5MNMn5.html",
+     "date": "2026-09"
+    }
+   ],
+   "kind": "画像"
+  },
+  {
+   "id": "marketing_event_planner",
+   "title": "活动策划 / 市场策划专员",
+   "aliases": [
+    "活动策划",
+    "市场策划专员",
+    "活动策划运营助理",
+    "市场部策划推广专员",
+    "活动执行策划",
+    "品牌推广专员"
+   ],
+   "majors": [
+    "市场营销",
+    "网络营销与直播电商",
+    "电子商务",
+    "视觉传达设计"
+   ],
+   "summary": "围绕节日、新品、门店或品牌节点策划线上线下营销活动，撰写方案文案、统筹物料与执行，并做数据复盘。",
+   "duties": [
+    "规划营销日历，策划节日、新品上市、品牌日等线上线下主题活动，输出方案、预算与排期",
+    "撰写活动文案、宣传推文与产品卖点，协同设计产出宣传物料",
+    "统筹活动落地执行：对接门店、供应商、嘉宾与媒体，现场管控与风险把控",
+    "收集市场/竞品信息并跟踪活动数据，输出复盘报告与优化建议"
+   ],
+   "requirements": [
+    {
+     "item": "能独立撰写完整的活动策划方案（主题、流程、预算、排期）",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "活动策划",
+      "策划方案",
+      "预算",
+      "排期"
+     ]
+    },
+    {
+     "item": "文案功底扎实，能写活动文案、推文、卖点",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "文案",
+      "推文",
+      "宣传文案",
+      "卖点"
+     ]
+    },
+    {
+     "item": "熟练使用PPT、Excel等办公软件",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "PPT",
+      "Excel",
+      "Word"
+     ]
+    },
+    {
+     "item": "有校园活动、社团策划或活动执行经历",
+     "category": "项目经验",
+     "level": "必需",
+     "keywords": [
+      "校园活动",
+      "社团",
+      "活动执行",
+      "项目经历"
+     ]
+    },
+    {
+     "item": "统筹协调与沟通能力强，执行力强",
+     "category": "通用素养",
+     "level": "必需",
+     "keywords": [
+      "沟通协调",
+      "执行力",
+      "团队协作",
+      "统筹"
+     ]
+    },
+    {
+     "item": "能做市场与竞品信息收集分析，并跟踪活动数据做复盘",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "市场调研",
+      "竞品分析",
+      "数据复盘",
+      "活动复盘"
+     ]
+    },
+    {
+     "item": "会用Photoshop等软件制作基础宣传物料",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "Photoshop",
+      "海报",
+      "宣传物料"
+     ]
+    },
+    {
+     "item": "熟悉美团、抖音生活服务、小红书、私域社群等平台的营销玩法",
+     "category": "专业技能",
+     "level": "加分",
+     "keywords": [
+      "抖音",
+      "美团",
+      "小红书",
+      "私域",
+      "新媒体活动"
+     ]
+    },
+    {
+     "item": "市场营销、广告、新闻传播、电子商务等相关专业",
+     "category": "通用素养",
+     "level": "加分",
+     "keywords": [
+      "市场营销",
+      "广告学",
+      "电子商务",
+      "新闻传播"
+     ]
+    },
+    {
+     "item": "对网络热点敏感，有创意",
+     "category": "通用素养",
+     "level": "加分",
+     "keywords": [
+      "热点",
+      "创意",
+      "网感"
+     ]
+    }
+   ],
+   "tools": [
+    "PPT",
+    "Excel",
+    "Word",
+    "Photoshop"
+   ],
+   "certificates": [
+    "数字营销技术应用职业技能等级证书（中教畅享（北京）科技有限公司）——依据河南林业职业学院2025级市场营销方案"
+   ],
+   "sources": [
+    {
+     "title": "大卖家（广州）文化传媒有限公司-运营助理（活动策划）（牛企直聘转载，大专及以上）",
+     "url": "https://campus.niuqizp.com/job-v8k5Z5C55.html",
+     "date": "2026-03"
+    },
+    {
+     "title": "广州菱龙餐饮有限公司-市场策划专员（连锁餐饮）（猎聘，学历不限，1-3年）",
+     "url": "https://www.liepin.com/job/1985857995.shtml",
+     "date": "2026-10"
+    },
+    {
+     "title": "华睿医疗-市场策划专员（猎聘，专科及以上，1-3年）",
+     "url": "https://www.liepin.com/job/1966397765.shtml",
+     "date": "2026-10"
+    },
+    {
+     "title": "北京金尚中嘉商业管理有限公司-市场部策划推广专员（牛企直聘转载，本科）",
+     "url": "https://campus.niuqizp.com/job-v8l5ZCt5L.html",
+     "date": "2026-04"
+    },
+    {
+     "title": "雅兰实业（深圳）有限公司-活动策划（牛企直聘转载，2026届本科及以上）",
+     "url": "https://campus.niuqizp.com/job-vwr5tMa5N.html",
+     "date": "2026-03"
+    }
+   ],
+   "kind": "画像"
+  },
+  {
+   "id": "short_video_content_planner",
+   "title": "新媒体内容策划 / 短视频编导",
+   "aliases": [
+    "短视频编导",
+    "编导",
+    "新媒体编导",
+    "短视频策划",
+    "短视频编导运营",
+    "拍摄剪辑"
+   ],
+   "majors": [
+    "网络营销与直播电商",
+    "数字媒体技术",
+    "市场营销",
+    "视觉传达设计",
+    "电子商务"
+   ],
+   "summary": "负责短视频选题策划、脚本/分镜撰写，指导拍摄并把控剪辑方向与成片质量，侧重内容创作而非账号日常运营。",
+   "duties": [
+    "结合账号定位与热点策划选题，撰写短视频文案、脚本和分镜",
+    "统筹拍摄：规划拍摄流程、指导出镜人员，把控运镜、灯光与画面",
+    "把控后期剪辑方向，参与或指导粗剪、精剪、配乐、字幕、调色",
+    "跟进平台（抖音、快手、视频号、小红书）热门风格，根据数据复盘调整内容"
+   ],
+   "requirements": [
+    {
+     "item": "能独立撰写短视频脚本/分镜脚本并策划选题",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "脚本",
+      "分镜",
+      "选题",
+      "短视频文案"
+     ]
+    },
+    {
+     "item": "文字功底扎实、对热点敏感，有网感",
+     "category": "通用素养",
+     "level": "必需",
+     "keywords": [
+      "文案",
+      "热点",
+      "网感",
+      "创意"
+     ]
+    },
+    {
+     "item": "熟练使用剪映、Premiere等剪辑软件",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "剪映",
+      "Premiere",
+      "PR",
+      "剪辑"
+     ]
+    },
+    {
+     "item": "会用相机/手机拍摄，懂基础运镜与布光",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "拍摄",
+      "运镜",
+      "布光",
+      "相机"
+     ]
+    },
+    {
+     "item": "熟悉抖音、快手、视频号等平台的内容形式与用户偏好",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "抖音",
+      "快手",
+      "视频号",
+      "小红书",
+      "平台规则"
+     ]
+    },
+    {
+     "item": "有个人账号、社团或实习的短视频作品（可提供作品集）",
+     "category": "项目经验",
+     "level": "必需",
+     "keywords": [
+      "短视频作品",
+      "作品集",
+      "个人账号",
+      "实习"
+     ]
+    },
+    {
+     "item": "会用After Effects、Photoshop做包装或封面",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "After Effects",
+      "AE",
+      "Photoshop",
+      "PS"
+     ]
+    },
+    {
+     "item": "能用AI工具辅助脚本生成、素材处理",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "AI工具",
+      "AIGC",
+      "AI脚本"
+     ]
+    },
+    {
+     "item": "有数据复盘意识，能根据播放、完播等数据调整内容",
+     "category": "专业技能",
+     "level": "加分",
+     "keywords": [
+      "数据复盘",
+      "完播率",
+      "数据分析"
+     ]
+    },
+    {
+     "item": "汉语言、广告、新闻传播、影视、数字媒体等相关专业",
+     "category": "通用素养",
+     "level": "加分",
+     "keywords": [
+      "广告",
+      "新闻传播",
+      "数字媒体",
+      "影视"
+     ]
+    }
+   ],
+   "tools": [
+    "剪映",
+    "Premiere Pro",
+    "After Effects",
+    "Photoshop",
+    "Final Cut Pro",
+    "达芬奇"
+   ],
+   "certificates": [],
+   "sources": [
+    {
+     "title": "大卖家（广州）文化传媒有限公司-编导（牛企直聘转载，大专以上）",
+     "url": "https://campus.niuqizp.com/job-vU85tZZtt.html",
+     "date": "2026-02"
+    },
+    {
+     "title": "上海水星电子商务有限公司-短视频剪辑岗（牛企直聘转载，专科）",
+     "url": "https://campus.niuqizp.com/job-vUrNL5aMN.html",
+     "date": "2026-09"
+    },
+    {
+     "title": "北京国富优选科技有限公司-拍摄剪辑（牛企直聘转载，大专及以上）",
+     "url": "https://campus.niuqizp.com/job-vym5zZt5t.html",
+     "date": "2026-06"
+    },
+    {
+     "title": "广州品学文化传播有限公司-新媒体编导（牛企直聘转载，头部大专及以上、正文本科及以上）",
+     "url": "https://campus.niuqizp.com/job-vlU5ZZMz5.html",
+     "date": "2026-03"
+    }
+   ],
+   "kind": "画像"
+  },
+  {
+   "id": "ui_designer_junior",
+   "title": "UI设计师（初级，App/网页界面）",
+   "aliases": [
+    "UI设计",
+    "UI实习生",
+    "UI设计助理",
+    "UI视觉设计",
+    "美工UI设计师",
+    "产品助理（UI）"
+   ],
+   "majors": [
+    "视觉传达设计",
+    "数字媒体技术",
+    "软件技术"
+   ],
+   "summary": "在主设计师或产品指导下完成App/Web界面、图标、组件与运营视觉物料设计，输出切图标注并跟进开发还原。",
+   "duties": [
+    "完成App/Web界面视觉稿、图标与组件设计，维护设计规范与组件库",
+    "制作活动Banner、弹窗、H5、海报、详情页等运营视觉物料",
+    "输出切图与标注，配合产品与前端跟进还原度和走查",
+    "参与需求评审，收集竞品与参考素材，根据反馈优化设计"
+   ],
+   "requirements": [
+    {
+     "item": "熟练使用Figma（或Sketch）进行界面与组件化设计",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "Figma",
+      "Sketch",
+      "组件",
+      "设计系统"
+     ]
+    },
+    {
+     "item": "熟练使用Photoshop，会Illustrator等平面设计软件",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "Photoshop",
+      "Illustrator",
+      "PS",
+      "AI"
+     ]
+    },
+    {
+     "item": "能提供UI界面、图标或视觉作品集",
+     "category": "项目经验",
+     "level": "必需",
+     "keywords": [
+      "作品集",
+      "UI作品",
+      "图标",
+      "App界面"
+     ]
+    },
+    {
+     "item": "掌握移动端/网页界面设计规范，了解切图与标注",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "界面设计",
+      "切图",
+      "标注",
+      "移动端",
+      "设计规范"
+     ]
+    },
+    {
+     "item": "具备基础审美与界面、Icon表现能力，注重细节",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "审美",
+      "Icon",
+      "视觉设计",
+      "排版"
+     ]
+    },
+    {
+     "item": "能理解产品与交互需求文档，与产品、开发顺畅沟通",
+     "category": "通用素养",
+     "level": "必需",
+     "keywords": [
+      "需求理解",
+      "沟通",
+      "交互",
+      "团队协作"
+     ]
+    },
+    {
+     "item": "会After Effects制作MG动画或界面动效",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "After Effects",
+      "AE",
+      "动效",
+      "MG动画"
+     ]
+    },
+    {
+     "item": "能绘制低保真原型、功能流程图并做竞品分析",
+     "category": "专业技能",
+     "level": "加分",
+     "keywords": [
+      "原型",
+      "流程图",
+      "竞品分析",
+      "Axure"
+     ]
+    },
+    {
+     "item": "有UI设计实习或电商详情页/运营物料设计经验",
+     "category": "项目经验",
+     "level": "加分",
+     "keywords": [
+      "UI实习",
+      "详情页",
+      "Banner",
+      "H5"
+     ]
+    },
+    {
+     "item": "会使用AI绘图/AI辅助设计工具",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "AI绘图",
+      "Midjourney",
+      "AIGC"
+     ]
+    }
+   ],
+   "tools": [
+    "Figma",
+    "Sketch",
+    "Photoshop",
+    "Illustrator",
+    "After Effects",
+    "Adobe XD",
+    "Axure"
+   ],
+   "certificates": [
+    "UI视觉设计师（初级）（河南林业职业学院2025级视觉传达设计方案写明颁发单位为腾讯云计算（北京）有限责任公司，未独立核实）",
+    "Adobe中国认证设计师（ACCD）（Adobe，见福州软件职业技术学院方案）"
+   ],
+   "sources": [
+    {
+     "title": "上海奥丽安人才咨询有限公司（顾问发布）-产品助理（UI）（猎聘，大专，经验不限）",
+     "url": "https://www.liepin.com/a/79771793.shtml",
+     "date": "2026-10"
+    },
+    {
+     "title": "艾斯-UI实习生（实习僧，大专）",
+     "url": "https://www.shixiseng.com/intern/inn_8bx6iamb7qtl",
+     "date": "2026-07"
+    },
+    {
+     "title": "溪木源（厦门）生物科技有限公司-UI设计（猎聘，大专，2年以上）",
+     "url": "https://www.liepin.com/job/1985929217.shtml",
+     "date": "2026-10"
+    },
+    {
+     "title": "壹联-UI设计助理实习（实习僧，本科）",
+     "url": "https://www.shixiseng.com/intern/inn_shpsqlshoamn",
+     "date": "2026-10"
+    },
+    {
+     "title": "深圳冠隆通互联技术有限公司-美工UI设计师（猎聘，学历不限，1-3年/正文2年以上）",
+     "url": "https://www.liepin.com/job/1984686949.shtml",
+     "date": "2026-09"
+    }
+   ],
+   "kind": "画像"
+  },
+  {
+   "id": "product_assistant",
+   "title": "产品助理 / 产品运营助理（互联网产品）",
+   "aliases": [
+    "产品助理",
+    "产品策划助理",
+    "产品运营专员",
+    "产品经理助理",
+    "产品实习生"
+   ],
+   "majors": [
+    "软件技术",
+    "电子商务",
+    "市场营销",
+    "数字媒体技术"
+   ],
+   "summary": "协助产品经理做竞品调研、需求整理、原型与流程图绘制，跟进研发测试并收集用户反馈与数据。",
+   "duties": [
+    "收集行业与竞品信息，开展竞品拆解，输出竞品分析报告",
+    "协助梳理需求、整理用户反馈和会议纪要，参与撰写PRD",
+    "使用Axure、XMind等绘制产品原型图、流程图",
+    "跟进研发进度，参与功能测试/用户验收测试（UAT）",
+    "收集上线后用户反馈与运营数据，初步整理分析并提出优化建议"
+   ],
+   "requirements": [
+    {
+     "item": "熟练使用Office（Excel、PPT、Word），能独立完成分析文档",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "Excel",
+      "PPT",
+      "Word",
+      "Office"
+     ]
+    },
+    {
+     "item": "能做竞品分析/产品拆解并输出报告",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "竞品分析",
+      "产品拆解",
+      "分析报告",
+      "市场调研"
+     ]
+    },
+    {
+     "item": "逻辑清晰，能梳理需求、归纳总结",
+     "category": "通用素养",
+     "level": "必需",
+     "keywords": [
+      "逻辑思维",
+      "需求分析",
+      "归纳总结"
+     ]
+    },
+    {
+     "item": "对互联网产品有浓厚兴趣，具备基础产品思维",
+     "category": "通用素养",
+     "level": "必需",
+     "keywords": [
+      "互联网产品",
+      "产品思维",
+      "用户体验"
+     ]
+    },
+    {
+     "item": "沟通顺畅、细心有责任心，执行力强",
+     "category": "通用素养",
+     "level": "必需",
+     "keywords": [
+      "沟通",
+      "责任心",
+      "执行力",
+      "协作"
+     ]
+    },
+    {
+     "item": "会使用Axure、XMind、Figma等原型或思维导图工具",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "Axure",
+      "XMind",
+      "Figma",
+      "墨刀",
+      "原型"
+     ]
+    },
+    {
+     "item": "能绘制产品流程图、写需求文档（PRD）或会议纪要",
+     "category": "专业技能",
+     "level": "加分",
+     "keywords": [
+      "PRD",
+      "需求文档",
+      "流程图",
+      "会议纪要"
+     ]
+    },
+    {
+     "item": "有互联网/C端/AI产品实习或独立产品拆解案例",
+     "category": "项目经验",
+     "level": "加分",
+     "keywords": [
+      "产品实习",
+      "C端",
+      "AI产品",
+      "产品案例"
+     ]
+    },
+    {
+     "item": "能整理用户反馈与线上数据并做初步分析",
+     "category": "专业技能",
+     "level": "加分",
+     "keywords": [
+      "数据分析",
+      "用户反馈",
+      "运营数据"
+     ]
+    },
+    {
+     "item": "参与过产品功能测试或用户验收测试",
+     "category": "项目经验",
+     "level": "加分",
+     "keywords": [
+      "功能测试",
+      "UAT",
+      "测试用例"
+     ]
+    }
+   ],
+   "tools": [
+    "Excel",
+    "PPT",
+    "Word",
+    "Axure",
+    "XMind",
+    "Figma",
+    "墨刀",
+    "Sketch"
+   ],
+   "certificates": [],
+   "sources": [
+    {
+     "title": "广州嗨优网络科技有限公司-产品助理（C端/AI）（猎聘，大专，1年以下）",
+     "url": "https://www.liepin.com/job/1985476165.shtml",
+     "date": "2026-09"
+    },
+    {
+     "title": "广州数码通客户服务有限公司-产品运营专员（牛企直聘转载，大专或以上）",
+     "url": "https://campus.niuqizp.com/job-vky5tCn5z.html",
+     "date": "2026-03"
+    },
+    {
+     "title": "超星集团有限公司-产品经理（助理类职责）（牛企直聘转载，本科及以上）",
+     "url": "https://campus.niuqizp.com/job-vs85z5tZz.html",
+     "date": "2026-05"
+    },
+    {
+     "title": "多益网络有限公司-产品策划助理（牛企直聘转载，本科）",
+     "url": "https://campus.niuqizp.com/job-vUy5tLL5n.html",
+     "date": "2025-12"
+    }
+   ],
+   "kind": "画像"
+  },
+  {
+   "id": "llm_agent_app_developer_junior",
+   "title": "大模型/AI智能体应用开发（初级/实习）",
+   "aliases": [
+    "AI应用开发实习生",
+    "智能体开发员",
+    "AI Agent开发实习生",
+    "大模型应用开发",
+    "AI应用工程实习生（智能体方向）"
+   ],
+   "majors": [
+    "人工智能技术应用",
+    "软件技术",
+    "大数据技术"
+   ],
+   "summary": "基于Coze/Dify等智能体平台和大模型API，搭建智能体、工作流与RAG知识库，并参与配套前后端开发与部署。",
+   "duties": [
+    "使用Dify、Coze、n8n等平台搭建、测试和调优智能体应用与自动化工作流",
+    "参与提示词设计与优化，提升回答质量",
+    "协助构建RAG知识库与向量检索",
+    "借助AI编程工具参与前后端代码开发、调试与API集成",
+    "撰写技术文档，协助部署、效果追踪与数据分析"
+   ],
+   "requirements": [
+    {
+     "item": "掌握Python编程基础",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "Python"
+     ]
+    },
+    {
+     "item": "会用至少一个智能体平台搭建智能体或工作流",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "Coze",
+      "Dify",
+      "n8n",
+      "智能体",
+      "工作流"
+     ]
+    },
+    {
+     "item": "了解提示词工程，能设计和优化Prompt",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "提示词",
+      "Prompt",
+      "提示词工程"
+     ]
+    },
+    {
+     "item": "了解RAG流程，能配置知识库或向量检索",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "RAG",
+      "知识库",
+      "向量数据库",
+      "Milvus"
+     ]
+    },
+    {
+     "item": "有Cursor、Trae等AI编程工具的使用和项目经验",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "Cursor",
+      "Trae",
+      "Windsurf",
+      "AI编程"
+     ]
+    },
+    {
+     "item": "熟悉Linux常用命令，能自己搭建开发环境",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "Linux",
+      "Git",
+      "环境搭建"
+     ]
+    },
+    {
+     "item": "了解LangChain、LangGraph、MCP等Agent框架或协议",
+     "category": "专业技能",
+     "level": "加分",
+     "keywords": [
+      "LangChain",
+      "LangGraph",
+      "MCP",
+      "Agent"
+     ]
+    },
+    {
+     "item": "有Java/SpringBoot后端或Vue前端项目经验（全栈方向）",
+     "category": "专业技能",
+     "level": "加分",
+     "keywords": [
+      "Java",
+      "SpringBoot",
+      "Vue",
+      "全栈"
+     ]
+    },
+    {
+     "item": "有智能体、聊天机器人或RAG项目作品",
+     "category": "项目经验",
+     "level": "加分",
+     "keywords": [
+      "智能体项目",
+      "聊天机器人",
+      "RAG项目",
+      "作品"
+     ]
+    },
+    {
+     "item": "有GitHub项目或项目部署经验",
+     "category": "项目经验",
+     "level": "加分",
+     "keywords": [
+      "GitHub",
+      "部署",
+      "Docker"
+     ]
+    }
+   ],
+   "tools": [
+    "Python",
+    "Coze",
+    "Dify",
+    "n8n",
+    "LangChain",
+    "LangGraph",
+    "Cursor",
+    "Trae",
+    "Git",
+    "Linux",
+    "Vue",
+    "SpringBoot"
+   ],
+   "certificates": [
+    "人工智能训练师职业技能等级证书（经人社部门备案的职业技能等级认定机构）",
+    "全国计算机等级考试二级 Python语言程序设计（教育部教育考试院）"
+   ],
+   "sources": [
+    {
+     "title": "轻松赔咨询（广州）有限公司-ai应用开发实习生（全栈/智能体）（国家大学生就业服务平台转载BOSS直聘，专科及以上）",
+     "url": "https://www.ncss.cn/student/jobs/TB5odVAdVnNXfJsvFTNGLi/detail.html",
+     "date": "2026-10"
+    },
+    {
+     "title": "上海途径信息技术有限公司-AI智能实习生（国家大学生就业服务平台转载BOSS直聘，专科及以上，面向2026届）",
+     "url": "https://www.ncss.cn/student/jobs/Wws3XGrtCEeDMcjyWvwpRM/detail.html",
+     "date": "2026-10"
+    },
+    {
+     "title": "点宽科技-AI应用工程实习生（智能体方向）（网易号转载，不限专业，学历未注明）",
+     "url": "https://m.163.com/dy/article/KTAJL97G0538N19X.html",
+     "date": "2026-05"
+    },
+    {
+     "title": "界面新闻-人社部公示拟发布职业信息：在“生成式人工智能系统应用员”下新增“智能体开发员”工种（新闻，非招聘）",
+     "url": "https://m.jiemian.com/article/14695006.html",
+     "date": "2026-07"
+    },
+    {
+     "title": "科技日报-11个新职业正式发布，智能体开发员等列为新工种（新闻，非招聘）",
+     "url": "https://www.stdaily.com/web/gdxw/2026-09/09/content_577908.html",
+     "date": "2026-09"
+    },
+    {
+     "title": "广东东软学院计算机学院-第五周企业招聘信息（人工智能）：爱普生AI工作台开发、恒智能AI Agent工程师等（多为本科及以上，用作技能参考）",
+     "url": "https://www.nuit.edu.cn/jsjxy/xqhz/zpxx/content_28514",
+     "date": "2026-04"
+    }
+   ],
+   "kind": "画像"
+  },
+  {
+   "id": "aigc_content_creator",
+   "title": "AIGC内容创作/AI提示词与内容运营（实习/初级）",
+   "aliases": [
+    "AIGC内容生成实习生",
+    "AIGC创意设计师",
+    "AI视频制作",
+    "AI内容制作实习生",
+    "生成式人工智能系统应用员"
+   ],
+   "majors": [
+    "数字媒体技术",
+    "动漫制作技术",
+    "人工智能技术应用"
+   ],
+   "summary": "用Midjourney、Stable Diffusion、可灵、即梦等AIGC工具，按需求写提示词生成并精修图片与短视频素材，整理提示词和案例。",
+   "duties": [
+    "按项目需求用AIGC工具编写、优化提示词，生成图片和短视频素材",
+    "筛选、分类、整理生成结果，并用Photoshop等软件精修",
+    "按剧本或编导要求完成AI分镜、短剧画面，并剪辑、调色、配音效",
+    "测试新的AIGC工具和模型，整理提示词技巧与应用案例文档"
+   ],
+   "requirements": [
+    {
+     "item": "熟练使用Photoshop进行修图、合成与排版",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "Photoshop",
+      "PS",
+      "修图"
+     ]
+    },
+    {
+     "item": "熟悉至少1-2种主流AI图像生成工具",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "Midjourney",
+      "Stable Diffusion",
+      "Flux",
+      "AIGC"
+     ]
+    },
+    {
+     "item": "能撰写并迭代优化提示词，控制风格与画面一致性",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "提示词",
+      "Prompt",
+      "AIGC"
+     ]
+    },
+    {
+     "item": "会用AI视频生成工具独立完成视频制作",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "可灵",
+      "即梦",
+      "Runway",
+      "AI视频"
+     ]
+    },
+    {
+     "item": "具备视频剪辑、调色、音效处理能力",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "剪映",
+      "Premiere",
+      "剪辑"
+     ]
+    },
+    {
+     "item": "有一定影视基础，理解镜头调度、分镜与节奏",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "分镜",
+      "镜头语言",
+      "短剧"
+     ]
+    },
+    {
+     "item": "了解ComfyUI、LoRA训练或ControlNet",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "ComfyUI",
+      "LoRA",
+      "ControlNet",
+      "Stable Diffusion"
+     ]
+    },
+    {
+     "item": "会After Effects基础（文字动效、MG动画）",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "After Effects",
+      "AE",
+      "MG动画"
+     ]
+    },
+    {
+     "item": "有AIGC作品集，或AI短剧、AI视频项目经验",
+     "category": "项目经验",
+     "level": "加分",
+     "keywords": [
+      "作品集",
+      "AIGC作品",
+      "AI短剧"
+     ]
+    },
+    {
+     "item": "设计、美术、动画、数字媒体等相关专业，有美术基础和审美能力",
+     "category": "通用素养",
+     "level": "加分",
+     "keywords": [
+      "数字媒体",
+      "动画",
+      "视觉传达",
+      "美术基础"
+     ]
+    }
+   ],
+   "tools": [
+    "Photoshop",
+    "Midjourney",
+    "Stable Diffusion",
+    "Flux",
+    "ComfyUI",
+    "可灵",
+    "即梦",
+    "Runway",
+    "剪映",
+    "Premiere Pro",
+    "After Effects",
+    "ChatGPT"
+   ],
+   "certificates": [],
+   "sources": [
+    {
+     "title": "深信产教融合（成都）科技有限公司-AIGC内容生成实习生——26届（国家大学生就业服务平台，专科及以上）",
+     "url": "https://www.ncss.cn/student/jobs/Xw68XDt7uX9nu2LBreR96P/detail.html",
+     "date": "2026-10"
+    },
+    {
+     "title": "成都飞象智汇企业管理有限责任公司-AIGC创意设计师（实习）（国家大学生就业服务平台，专科及以上，2026届）",
+     "url": "https://www.ncss.cn/student/jobs/8g2VCEsvGYQPFsyAf4iTbu/detail.html",
+     "date": "2026-10"
+    },
+    {
+     "title": "杭州漫禾动漫有限公司-AI视频制作实习（国家大学生就业服务平台，专科及以上）",
+     "url": "https://www.ncss.cn/student/jobs/6jzgoRafiKdMHL729rUqDs/detail.html",
+     "date": "2026-10"
+    },
+    {
+     "title": "湖南快乐阳光互动娱乐传媒有限公司-AI内容制作实习生（国家大学生就业服务平台转载实习僧，在校大学生，学历不限）",
+     "url": "https://www.ncss.cn/student/jobs/E2sHwZzFNZW3VU4LzWFZAX/detail.html",
+     "date": "2026-10"
+    },
+    {
+     "title": "北京小熊博望科技有限公司-ai设计实习生（国家大学生就业服务平台转载BOSS直聘，本科及以上）",
+     "url": "https://www.ncss.cn/student/jobs/HtYAtfLamqF6eoTLrFEhVH/detail.html",
+     "date": "2026-10"
+    },
+    {
+     "title": "腾讯云开发者社区-新职业“生成式人工智能系统应用员”定义（新闻，非招聘）",
+     "url": "https://cloud.tencent.com/developer/news/1692222",
+     "date": "2024-08"
+    }
+   ],
+   "kind": "画像"
+  },
+  {
+   "id": "game_client_developer_junior",
+   "title": "游戏客户端开发（Unity/Cocos，初级/实习）",
+   "aliases": [
+    "Unity开发实习生",
+    "U3D实习生",
+    "游戏客户端开发工程师",
+    "Cocos Creator游戏前端开发",
+    "Unity3D开发"
+   ],
+   "majors": [
+    "软件技术",
+    "虚拟现实技术应用",
+    "数字媒体技术"
+   ],
+   "summary": "用Unity（C#）或Cocos Creator（TypeScript）开发游戏和交互功能模块、UI界面，并参与性能与效果优化。",
+   "duties": [
+    "按策划和项目需求，用Unity/C#开发游戏功能模块和交互逻辑",
+    "用UGUI等实现游戏界面",
+    "维护和修改项目代码，优化代码、渲染效果与包体",
+    "配合美术实现视觉效果，编写或优化Shader",
+    "参与测试和项目维护"
+   ],
+   "requirements": [
+    {
+     "item": "熟悉Unity引擎，熟练使用C#开发",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "Unity",
+      "Unity3D",
+      "C#"
+     ]
+    },
+    {
+     "item": "具备面向对象编程思想和良好编码习惯，了解常用设计模式",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "面向对象",
+      "设计模式",
+      "C#"
+     ]
+    },
+    {
+     "item": "熟悉UGUI界面开发",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "UGUI",
+      "Unity UI"
+     ]
+    },
+    {
+     "item": "熟悉Git版本控制",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "Git",
+      "版本控制"
+     ]
+    },
+    {
+     "item": "有可演示的Unity/Cocos作品或个人小游戏demo（培训作业不算实际开发经验）",
+     "category": "项目经验",
+     "level": "必需",
+     "keywords": [
+      "游戏demo",
+      "Unity项目",
+      "作品",
+      "小游戏"
+     ]
+    },
+    {
+     "item": "计算机相关专业",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "软件技术",
+      "计算机",
+      "虚拟现实技术应用"
+     ]
+    },
+    {
+     "item": "掌握Cocos Creator及TypeScript/JavaScript（ES6+）",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "Cocos Creator",
+      "TypeScript",
+      "JavaScript"
+     ]
+    },
+    {
+     "item": "有图形学基础，了解OpenGL/Direct3D，有Shader开发经验",
+     "category": "专业技能",
+     "level": "加分",
+     "keywords": [
+      "Shader",
+      "OpenGL",
+      "Direct3D",
+      "图形学"
+     ]
+    },
+    {
+     "item": "做过Unity性能优化、渲染优化",
+     "category": "专业技能",
+     "level": "加分",
+     "keywords": [
+      "性能优化",
+      "渲染优化",
+      "Unity"
+     ]
+    },
+    {
+     "item": "熟悉Android SDK或移动游戏打包开发",
+     "category": "专业技能",
+     "level": "加分",
+     "keywords": [
+      "Android",
+      "Android SDK",
+      "移动端"
+     ]
+    }
+   ],
+   "tools": [
+    "Unity",
+    "C#",
+    "Visual Studio",
+    "Cocos Creator",
+    "TypeScript",
+    "JavaScript",
+    "Git",
+    "UGUI"
+   ],
+   "certificates": [
+    "虚拟现实应用开发职业技能等级证书（1+X）"
+   ],
+   "sources": [
+    {
+     "title": "苏州九界文化传媒有限公司-Unity开发实习生（国家大学生就业服务平台，来源江苏省高校招生就业指导服务中心，学历不限）",
+     "url": "https://job.ncss.cn/student/jobs/JcyGd2uLJXLsU59ADD2ZfF/detail.html",
+     "date": "2026-10"
+    },
+    {
+     "title": "北京易格通智仿真技术有限公司-U3D实习生（Unity3D虚拟现实方向）（国家大学生就业服务平台，专科及以上）",
+     "url": "https://www.ncss.cn/student/jobs/Bu88BCHf2NkMeXRPFSDuiv/detail.html",
+     "date": "2026-10"
+    },
+    {
+     "title": "多益网络-2027届校园招聘秋季提前批（含游戏客户端开发工程师）（国家大学生就业服务平台，专科及以上）",
+     "url": "https://www.ncss.cn/student/jobs/FLw1Jpz9r7hd9gDbtf727y/detail.html",
+     "date": "2026-07"
+    },
+    {
+     "title": "郑州市掌潮互动网络科技有限公司-CocosCreator游戏前端开发工程师（国家大学生就业服务平台转载BOSS直聘，本科及以上应届生）",
+     "url": "https://www.ncss.cn/student/jobs/LgWPXmPb4wH2Y6KHqAmKAV/detail.html",
+     "date": "2026-10"
+    }
+   ],
+   "kind": "画像"
+  },
+  {
+   "id": "game_tester_junior",
+   "title": "游戏测试工程师（初级/实习）",
+   "aliases": [
+    "游戏测试实习生",
+    "游戏测试员",
+    "游戏QA",
+    "软件测试实习生"
+   ],
+   "majors": [
+    "软件技术",
+    "数字媒体技术",
+    "虚拟现实技术应用"
+   ],
+   "summary": "在PC/安卓/iOS上做游戏版本的功能、兼容、性能测试，编写用例、提交和跟踪Bug，并提出体验优化建议。",
+   "duties": [
+    "阅读需求文档，编写和维护测试方案与测试用例",
+    "执行PC、安卓、iOS版本的功能、数值、兼容性、性能测试",
+    "发现并规范记录Bug，跟进修复与回归验证",
+    "编写测试报告，从玩家体验角度提出玩法、交互、数值优化建议"
+   ],
+   "requirements": [
+    {
+     "item": "能编写测试用例和测试方案",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "测试用例",
+      "测试方案",
+      "测试计划"
+     ]
+    },
+    {
+     "item": "能清晰记录Bug（复现步骤、环境），并跟踪修复与回归",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "Bug",
+      "缺陷跟踪",
+      "回归测试"
+     ]
+    },
+    {
+     "item": "了解功能、兼容性、性能测试，有多端测试经历",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "功能测试",
+      "兼容性测试",
+      "性能测试",
+      "Android",
+      "iOS"
+     ]
+    },
+    {
+     "item": "热爱游戏，游戏经验丰富（可在简历写明玩过的类型，如SLG/RPG/MMO）",
+     "category": "通用素养",
+     "level": "必需",
+     "keywords": [
+      "游戏经验",
+      "SLG",
+      "RPG",
+      "MMO"
+     ]
+    },
+    {
+     "item": "熟练使用Office，能写测试报告",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "Office",
+      "Excel",
+      "测试报告"
+     ]
+    },
+    {
+     "item": "逻辑清晰、细心，善于发现边缘场景问题，沟通协作好",
+     "category": "通用素养",
+     "level": "必需",
+     "keywords": [
+      "逻辑思维",
+      "细心",
+      "沟通",
+      "团队协作"
+     ]
+    },
+    {
+     "item": "掌握Python，能写简单脚本或测试工具",
+     "category": "专业技能",
+     "level": "加分",
+     "keywords": [
+      "Python",
+      "脚本",
+      "自动化测试"
+     ]
+    },
+    {
+     "item": "掌握基础Linux命令",
+     "category": "专业技能",
+     "level": "加分",
+     "keywords": [
+      "Linux"
+     ]
+    },
+    {
+     "item": "做过接口测试，或会用抓包工具",
+     "category": "专业技能",
+     "level": "加分",
+     "keywords": [
+      "接口测试",
+      "抓包",
+      "网络"
+     ]
+    },
+    {
+     "item": "英语四级以上，能读写英文文档",
+     "category": "证书",
+     "level": "加分",
+     "keywords": [
+      "CET-4",
+      "英语四级",
+      "英文文档"
+     ]
+    }
+   ],
+   "tools": [
+    "Office/Excel",
+    "Python",
+    "Linux",
+    "Android/iOS测试设备"
+   ],
+   "certificates": [
+    "全国大学英语四级考试（CET-4）证书（教育部教育考试院）",
+    "计算机技术与软件专业技术资格（水平）考试-软件评测师（人力资源社会保障部、工业和信息化部）"
+   ],
+   "sources": [
+    {
+     "title": "多亿网络-游戏测试实习生（实习僧，学历未限，接受大一大二暑期实习）",
+     "url": "https://www.shixiseng.com/intern/inn_p9bgu1ckqqnr",
+     "date": "2026-08"
+    },
+    {
+     "title": "多益网络-2027届校园招聘秋季提前批（含游戏测试）（国家大学生就业服务平台，专科及以上）",
+     "url": "https://www.ncss.cn/student/jobs/FLw1Jpz9r7hd9gDbtf727y/detail.html",
+     "date": "2026-07"
+    },
+    {
+     "title": "点宽科技-测试实习生（网易号转载，大专及以上，Python与Linux优先）",
+     "url": "https://m.163.com/dy/article/KTAJL97G0538N19X.html",
+     "date": "2026-05"
+    },
+    {
+     "title": "亿帆环球科技(济南)有限公司-游戏测试实习生（国家大学生就业服务平台转载智联招聘，本科在读，CET-4）",
+     "url": "https://www.ncss.cn/student/jobs/AtzPD6yJ72DocUtPU7Q2ko/detail.html",
+     "date": "2026-10"
+    },
+    {
+     "title": "网易互娱-游戏测试工程师（实习）（实习僧，本科或以上）",
+     "url": "https://www.shixiseng.com/intern/inn_fq5u24am1mvq",
+     "date": "2026-07"
+    }
+   ],
+   "kind": "画像"
+  },
+  {
+   "id": "game_3d_artist_assistant",
+   "title": "游戏美术助理（3D建模方向，初级/实习）",
+   "aliases": [
+    "游戏3D建模实习生",
+    "三维模型设计师",
+    "3D场景/角色建模",
+    "次世代建模实习生",
+    "游戏模型师"
+   ],
+   "majors": [
+    "动漫制作技术",
+    "虚拟现实技术应用",
+    "数字媒体技术"
+   ],
+   "summary": "按原画用3ds Max/Maya制作游戏角色、场景、道具的高低模，并完成UV和贴图，配合导入引擎。",
+   "duties": [
+    "按原画和项目风格制作游戏角色、场景、道具的低模、中模、高模",
+    "展UV，绘制或烘焙贴图与材质",
+    "整理、导出模型资源，配合程序导入Unity/UE",
+    "参与公司培训，按美术规范在项目中迭代修改"
+   ],
+   "requirements": [
+    {
+     "item": "熟练使用3ds Max或Maya制作三维模型",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "3ds Max",
+      "Maya",
+      "建模"
+     ]
+    },
+    {
+     "item": "能按原画制作高模、低模，会展UV和制作贴图",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "高模",
+      "低模",
+      "UV",
+      "贴图"
+     ]
+    },
+    {
+     "item": "会用Photoshop绘制或处理贴图",
+     "category": "软件工具",
+     "level": "必需",
+     "keywords": [
+      "Photoshop",
+      "贴图绘制"
+     ]
+    },
+    {
+     "item": "美术基础扎实（造型、色彩、空间感）",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "美术基础",
+      "素描",
+      "色彩"
+     ]
+    },
+    {
+     "item": "有能展示建模能力的个人作品集",
+     "category": "项目经验",
+     "level": "必需",
+     "keywords": [
+      "作品集",
+      "建模作品"
+     ]
+    },
+    {
+     "item": "动漫制作、数字媒体、动画、虚拟现实等美术相关专业",
+     "category": "专业技能",
+     "level": "必需",
+     "keywords": [
+      "动漫制作技术",
+      "数字媒体",
+      "动画",
+      "虚拟现实技术应用"
+     ]
+    },
+    {
+     "item": "会用ZBrush雕刻高模",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "ZBrush",
+      "雕刻",
+      "次世代"
+     ]
+    },
+    {
+     "item": "会用Substance Painter制作PBR材质",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "Substance Painter",
+      "PBR",
+      "材质"
+     ]
+    },
+    {
+     "item": "了解Unity或UE，能把美术资源导入引擎",
+     "category": "软件工具",
+     "level": "加分",
+     "keywords": [
+      "Unity",
+      "UE",
+      "Unreal Engine"
+     ]
+    },
+    {
+     "item": "懂基础动画原理、骨骼绑定或蒙皮",
+     "category": "专业技能",
+     "level": "加分",
+     "keywords": [
+      "动画原理",
+      "骨骼绑定",
+      "蒙皮"
+     ]
+    }
+   ],
+   "tools": [
+    "3ds Max",
+    "Maya",
+    "ZBrush",
+    "Substance Painter",
+    "Photoshop",
+    "Unity",
+    "Unreal Engine"
+   ],
+   "certificates": [
+    "数字创意建模职业技能等级证书（1+X，腾讯）",
+    "游戏美术设计职业技能等级证书",
+    "图形图像应用技术（3ds MAX）职业技能等级证书"
+   ],
+   "sources": [
+    {
+     "title": "长沙巨浪网络科技有限公司-动画、特效、模型实习生（国家大学生就业服务平台，来源长沙理工大学，大专及以上，动漫制作/数字媒体/虚拟现实等专业）",
+     "url": "https://www.ncss.cn/student/jobs/QzHCuxy8Bts8ZxoNyLbTku/detail.html",
+     "date": "2026-10"
+    },
+    {
+     "title": "多益网络-2027届校园招聘秋季提前批（含三维模型设计师、原画设计师）（国家大学生就业服务平台，专科及以上）",
+     "url": "https://www.ncss.cn/student/jobs/FLw1Jpz9r7hd9gDbtf727y/detail.html",
+     "date": "2026-07"
+    },
+    {
+     "title": "成都原力电脑动画制作有限公司-次世代游戏角色艺术家-新人岗（国家大学生就业服务平台，本科及以上）",
+     "url": "https://job.ncss.cn/student/jobs/WdRfQVMfm7z8sMrQgF8SMZ/detail.html",
+     "date": "2026-10"
+    },
+    {
+     "title": "红果互娱-3D建模师校招（实习僧，大专或以上；页面刷新于2022年，仅用作技能参考）",
+     "url": "https://www.shixiseng.com/intern/inn_v2vxnkpafti0",
+     "date": "2022-10"
     }
    ],
    "kind": "画像"

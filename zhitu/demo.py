@@ -26,6 +26,16 @@ class DemoLLM:
             return json.dumps(self._diagnose_job(user), ensure_ascii=False)
         if system == prompts.PLAN30:
             return json.dumps(self._plan30(user), ensure_ascii=False)
+        if system == prompts.RESUME_TIPS:
+            resume = user.split("【简历】\n", 1)[1]
+            info = json.loads(user.split("【目标岗位与诊断】\n", 1)[1].split("\n\n【简历】")[0])
+            rew = []
+            for r in info["requirements"]:
+                ev = r.get("evidence") or ""
+                if ev and ev in resume and len(rew) < 3:
+                    rew.append({"original": ev, "rewrite": f"（演示）{ev.rstrip('。')}，共完成（填写真实数字）项，可以写清用到的工具和结果",
+                                "requirement": r["item"], "why": "（演示）用“动作 + 工具 + 结果”的写法更清楚"})
+            return json.dumps({"rewrites": rew, "questions": ["（演示）这段经历里你具体负责哪部分？", "（演示）最后的结果可以用什么数字说明？"]}, ensure_ascii=False)
         if system == prompts.EXTRACT_JOB:
             return json.dumps(self._extract(user), ensure_ascii=False)
         if system == prompts.INTERVIEW_Q:

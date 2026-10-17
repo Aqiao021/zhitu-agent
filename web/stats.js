@@ -1,5 +1,5 @@
 "use strict";
-const NAMES = { diagnose: "差距诊断", plan: "30 天计划", interview: "模拟面试", ask: "就业问答" };
+const NAMES = { diagnose: "差距诊断", plan: "30 天计划", interview: "模拟面试", ask: "就业问答", resume_tips: "简历优化建议", recommend: "岗位推荐" };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const q = location.search;
 const STATIC_MODE = document.documentElement.dataset.mode === "static";
@@ -21,7 +21,7 @@ async function loadStats() {
     document.getElementById("exportRaw").addEventListener("click", () => { try { download("zhitu-local-records.json", localStorage.getItem("zt_local_records_v1") || "[]", "application/json"); } catch (error) { showError(error); } });
     document.getElementById("clearLocal").addEventListener("click", () => {
       if (!confirm("将清除当前浏览器的诊断结果、计划、进度和使用记录。请先导出备份。确定清除？")) return;
-      try { for (const key of ["zt_diagnosis", "zt_plan", "zt_done", "zt_session", "zt_job", "zt_mode", "zt_legacy_plan", "zt_local_records_v1"]) localStorage.removeItem(key); location.reload(); } catch (error) { showError(error); }
+      try { for (const key of ["zt_diagnosis", "zt_dx_history", "zt_hid", "zt_pick", "zt_plan", "zt_done", "zt_session", "zt_job", "zt_mode", "zt_legacy_plan", "zt_local_records_v1"]) localStorage.removeItem(key); location.reload(); } catch (error) { showError(error); }
     });
     return records.stats();
   }
@@ -35,7 +35,7 @@ loadStats().then((d) => {
   const fbCount = Object.values(d.feedback).reduce((a, e) => a + e.count, 0);
   const diag = d.feedback.diagnose || {};
   document.getElementById("kpis").innerHTML = [
-    STATIC_MODE ? ["记录范围", "本机", "仅当前浏览器"] : ["试用人数", d.users, "按浏览器去重"], ["使用次数", total, "四项功能合计"], ["收到评分", fbCount, "用户主动提交"],
+    STATIC_MODE ? ["记录范围", "本机", "仅当前浏览器"] : ["试用人数", d.users, "按浏览器去重"], ["使用次数", total, "模型功能合计"], ["收到评分", fbCount, "用户主动提交"],
     ["诊断准确度", diag.avg_rating ? diag.avg_rating + " / 5" : "—", "用户打分平均"]
   ].map(([k, v, s]) => `<div class="kpi"><span>${esc(k)}</span><b class="num">${esc(v)}</b><small>${esc(s)}</small></div>`).join("");
   document.getElementById("events").innerHTML = "<tr><th>功能</th><th>次数</th><th>成功率</th><th>平均耗时</th></tr>" +

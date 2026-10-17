@@ -181,6 +181,65 @@ class JobDBTest(unittest.TestCase):
         self.assertIsNone(db.get(job["id"]))
 
 
+class RecommendTipsTest(unittest.TestCase):
+    def test_keyword_mentions(self):
+        from zhitu.jobs import mentions
+        self.assertTrue(mentions("PS", "会用 ps 修图"))
+        self.assertFalse(mentions("PS", "熟悉 https 协议"))  # short words must stand alone
+        self.assertTrue(mentions("Python", "熟悉python"))
+        self.assertFalse(mentions("C", "会用 c 语言"))  # one-letter keywords are ignored
+
+    def test_recommend_ranks_relevant_jobs(self):
+        agent = Agent(DemoLLM(), KB, JOBS)
+        r = agent.recommend("大数据与会计专业，考过初级会计，会用用友U8和金蝶做账，熟练 Excel 数据透视表和 VLOOKUP，在代账公司实习，负责开票和报税。电话 13800001234")
+        self.assertEqual(r["results"][0]["id"], "accounting_assistant")
+        self.assertEqual(r["privacy"].get("手机号"), 1)
+        self.assertTrue(all(0 <= x["score"] <= 100 for x in r["results"]))
+        with self.assertRaises(ModelError):
+            agent.recommend("太短")
+
+    def test_resume_tips_cannot_invent(self):
+        resume = "人工智能技术应用专业。用 LabelImg 标注过图片。会用 Excel 统计数据。参加学院 AI 训练营。"
+        reply = {"rewrites": [
+            {"original": "用 LabelImg 标注过图片", "rewrite": "使用 LabelImg 完成 3000 张图片的矩形框标注", "requirement": "图像标注"},
+            {"original": "在字节跳动实习半年", "rewrite": "在字节跳动负责数据标注", "requirement": "实习"},
+            {"original": "会用 Excel 统计数据", "rewrite": "用 Excel 数据透视表统计数据", "requirement": "Excel"}],
+            "questions": ["标注了多少张？"]}
+        t = Agent(ScriptedLLM(reply), KB, JOBS).resume_tips(resume, {"job_title": "x", "requirements": [{"item": "a", "status": "具备"}]})
+        self.assertEqual(t["dropped"], 1)  # "original" not in the resume
+        self.assertEqual(len(t["rewrites"]), 2)
+        self.assertNotIn("3000", t["rewrites"][0]["rewrite"])  # invented number becomes a blank
+        self.assertIn("（填写真实数字）", t["rewrites"][0]["rewrite"])
+        self.assertTrue(t["rewrites"][0]["blanks"])
+        with self.assertRaises(ModelError):
+            Agent(ScriptedLLM(reply), KB, JOBS).resume_tips(resume, {})
+
+
+class ComboTest(unittest.TestCase):
+    def test_common_requirements_counted(self):
+        ids = ["ai_app_dev_assistant", "llm_agent_app_developer_junior", "data_analyst_assistant", "ai_trainer_annotator"]
+        c = JOBS.combine(ids)
+        self.assertEqual(c["combo"]["n"], 4)
+        self.assertEqual(c["id"], "combo:" + ",".join(sorted(ids)))
+        top = c["requirements"][0]
+        self.assertEqual(top["count"], 4)  # every posting asks for Python
+        self.assertEqual(top["tag"], "python")
+        counts = [r["count"] for r in c["requirements"]]
+        self.assertEqual(counts, sorted(counts, reverse=True))
+        self.assertTrue(all(r["count"] >= 2 for r in c["requirements"]))
+        self.assertEqual(JOBS.get(c["id"])["combo"]["n"], 4)
+        self.assertIsNone(JOBS.combine(["ai_app_dev_assistant"]))
+        self.assertIsNone(JOBS.combine(["nope", "nope2"]))
+
+    def test_combo_diagnosis_carries_counts(self):
+        c = JOBS.combine(["ecommerce_operator", "live_stream_operator", "new_media_operator"])
+        llm = ScriptedLLM({"summary": "s", "results": [{"n": 1, "status": "缺少", "evidence": ""}]})
+        d = Agent(llm, KB, JOBS).diagnose(RESUME, job_id=c["id"])
+        self.assertEqual(d["source"]["combo"]["n"], 3)
+        self.assertTrue(all(isinstance(r["count"], int) for r in d["requirements"]))
+        self.assertIn("/3个岗位要求", llm.sent[0][1][0]["content"])
+
+
 class JobDiagnoseTest(unittest.TestCase):
     def test_requirements_fixed_and_weighted(self):
         job = JOBS.get("ai_trainer_annotator")
@@ -267,7 +326,7 @@ class UserKeyTest(unittest.TestCase):
         base = Config()
         for bad in ({"provider": "evil", "api_key": "synthetic-test-credential"},
                     {"provider": "deepseek", "api_key": "短"},
-                    {"provider": "deepseek", "api_key": "synthetic 中文 123456"},
+                    {"provider": "deepseek", "api_key": "synthetic 中文 credential"},
                     {"provider": "ark", "api_key": "synthetic-test-credential", "model": ""},
                     {"provider": "deepseek", "api_key": "synthetic-test-credential", "model": "a b"}):
             with self.assertRaises(ModelError):

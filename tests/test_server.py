@@ -78,6 +78,13 @@ class ServerTest(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError):
             self.get("/api/jobs/nope")
 
+    def test_combo_routes(self):
+        status, _, body = self.get("/api/jobs/common?ids=ui_designer_junior,ecommerce_visual_designer,video_editor")
+        c = json.loads(body)
+        self.assertEqual(c["combo"]["n"], 3)
+        _, _, body = self.get("/api/jobs/" + urllib.parse.quote(c["id"]))
+        self.assertEqual(json.loads(body)["kind"], "组合")
+
     def test_job_diagnose_and_plan(self):
         status, d = self.post("/api/diagnose", {"resume": "技能：会使用 Python 和 Pandas 做数据清洗，用 LabelImg 标注过图片，会用 Excel",
                                                 "job_id": "ai_trainer_annotator"})
@@ -142,6 +149,16 @@ class ServerTest(unittest.TestCase):
         h = json.loads(body)
         self.assertTrue(h["allow_user_key"])
         self.assertIn("deepseek", [p["id"] for p in h["providers"]])
+
+    def test_recommend_and_tips(self):
+        resume = "数字媒体技术专业，熟练使用 Premiere 和 After Effects 剪辑社团宣传片，会用 Photoshop 修图，有作品集。"
+        status, r = self.post("/api/recommend", {"resume": resume})
+        self.assertEqual(status, 200)
+        self.assertEqual(r["results"][0]["id"], "video_editor")
+        status, d = self.post("/api/diagnose", {"resume": resume, "job_id": "video_editor"})
+        status, t = self.post("/api/resume_tips", {"resume": resume, "diagnosis": d})
+        self.assertEqual(status, 200)
+        self.assertIn("rewrites", t)
 
     def test_rate_limit(self):
         old = server.CFG.rate_limit
