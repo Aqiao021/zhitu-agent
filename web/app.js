@@ -91,12 +91,33 @@ async function busy(btn, label, fn) {
   const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span>${label}`;
   try { return await fn(); } catch (e) { toast(e.message, true); } finally { btn.disabled = false; btn.innerHTML = old; }
 }
-function skeleton(msg) {
-  return `<div class="skeleton"><div class="sk-msg"><span class="spin"></span>${esc(msg)}</div><div class="sk" style="width:70%"></div><div class="sk"></div><div class="sk" style="width:85%"></div><div class="sk" style="width:60%"></div></div>`;
+function skeleton(msg, stages = [], every = 6) {
+  const id = "ld" + Math.random().toString(36).slice(2, 8), t0 = Date.now();
+  const tick = () => {
+    const box = document.getElementById(id); if (!box) return clearInterval(timer);
+    const sec = Math.floor((Date.now() - t0) / 1000), cur = Math.min(stages.length - 1, Math.floor(sec / every));
+    $(".sk-time", box).textContent = `已等待 ${sec} 秒`;
+    $$(".ld-step", box).forEach((el, k) => { el.classList.toggle("done", k < cur); el.classList.toggle("cur", k === cur); });
+  };
+  const timer = setInterval(tick, 1000); queueMicrotask(tick);
+  return `<div class="skeleton" id="${id}"><div class="sk-msg"><span class="spin"></span><span>${esc(msg)}</span><span class="sk-time"></span></div>
+    ${stages.length ? `<ol class="ld-steps">${stages.map((x) => `<li class="ld-step"><i></i>${esc(x)}</li>`).join("")}</ol>` : ""}
+    <div class="sk" style="width:70%"></div><div class="sk"></div><div class="sk" style="width:85%"></div></div>`;
+}
+/* motion helpers: staggered entrance + number count-up (skipped when the user prefers reduced motion) */
+const calm = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+function stagger(nodes, step = 25, max = 24) { [...nodes].forEach((el, k) => { el.style.setProperty("--i", Math.min(k, max)); el.classList.add("enter"); }); }
+function countUp(root) {
+  $$("[data-count]", root).forEach((el) => {
+    const end = +el.dataset.count, suffix = el.innerHTML.replace(/^\d+/, ""); if (calm() || !end) return;
+    const t0 = performance.now(), dur = 700;
+    const f = (t) => { const p = Math.min(1, (t - t0) / dur), v = Math.round(end * (1 - Math.pow(1 - p, 3))); el.innerHTML = v + suffix; if (p < 1) requestAnimationFrame(f); };
+    el.innerHTML = 0 + suffix; requestAnimationFrame(f);
+  });
 }
 
 /* ------------------------------------------------------------------ state */
-const S = { diagnosis: store.get("diagnosis", null), plan: store.get("plan", null), done: store.get("done", {}), history: [], current: null, filter: "全部",
+const S = { hid: store.get("hid", null), diagnosis: store.get("diagnosis", null), plan: store.get("plan", null), done: store.get("done", {}), history: [], current: null, filter: "全部",
   job: store.get("job", null), mode: store.get("mode", "job"), major: "", selDay: null, majors: [] };
 async function getJSON(path) {
   if (STATIC_MODE) {
@@ -274,6 +295,7 @@ async function searchJobs() {
         <span class="jc-foot"><span>必需 ${j.must} 条 · 共 ${j.total} 条要求</span><span class="jc-go">查看要求${I("arrow")}</span></span>
       </button>`).join("") || `<div class="need">${I("search")}<p>没有找到相关岗位，换个关键词试试，或者切换到“粘贴招聘”直接诊断。</p></div>`;
     $$("#jobResults .job-card").forEach((b) => b.addEventListener("click", () => openJob(b.dataset.id)));
+    stagger($$("#jobResults .job-card"));
   } catch (e) { if (seq === searchSeq) toast(e.message, true); }
 }
 $("#jobForm").addEventListener("submit", (e) => { e.preventDefault(); searchJobs(); });
@@ -300,7 +322,7 @@ async function openJob(id) {
     <h4>${I("link")}来源</h4><ul class="plain src">${j.sources.map((x) => `<li>${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a>` : esc(x.title)}${x.date ? ` · ${esc(x.date)}` : ""}</li>`).join("")}</ul>
     <p class="notice">${I("alert")}<span>${j.kind === "导入" ? "这是同学提交、经整理的真实招聘信息，已隐去公司和联系方式；投递前请到招聘平台核实。" : "岗位画像根据公开资料归纳，不代表某家公司的真实招聘；部分来源要求本科，只用于归纳技能要求。"}</span></p>
     <div class="sheet-actions"><button class="btn btn-primary" type="button" id="btnPickJob">用这个岗位诊断我的简历 ${I("arrow")}</button></div>`);
-  $("#btnPickJob").addEventListener("click", () => { pickJob(j); closeSheet(); location.hash = "#/app/diagnose"; });
+  $("#btnPickJob").addEventListener("click", () => { pickJob(j); closeSheet(); location.hash = "#/app/diagnose"; if (!$("#resume").value.trim()) setTimeout(() => $("#resume").focus({ preventScroll: true }), 350); });
 }
 function pickJob(j) {
   S.job = { id: j.id, title: j.title, kind: j.kind, majors: j.majors, must: j.requirements.filter((r) => r.level === "必需").length, total: j.requirements.length, tools: j.tools.slice(0, 6) };
@@ -346,6 +368,82 @@ function renderTarget() {
 function setMode(m) { S.mode = m; store.set("mode", m); renderTarget(); }
 $$("#targetSeg button").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.m)));
 
+/* ------------------------------------------------------------------ diagnosis history (this browser only) */
+const RANK = { "缺少": 0, "部分具备": 1, "具备": 2 };
+const histKey = (d) => (d.source?.type === "job" ? "job:" + d.source.id : "t:" + d.job_title);
+const getHist = () => store.get("dx_history", []);
+function saveHistory(d) {
+  const h = getHist(), id = Date.now().toString(36);
+  h.unshift({ id, ts: Date.now(), key: histKey(d), title: d.job_title, score: d.match_score, d });
+  for (let n = Math.min(h.length, 20); n > 0; n--) {   // shrink if the browser storage is full
+    try { localStorage.setItem("zt_dx_history", JSON.stringify(h.slice(0, n))); break; } catch (e) { /* try fewer */ }
+  }
+  return id;
+}
+const fmtDate = (ts) => { const t = new Date(ts); return `${t.getMonth() + 1}月${t.getDate()}日 ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`; };
+function previousOf(hid) {   // the most recent earlier diagnosis for the same job
+  const h = getHist(), i = h.findIndex((x) => x.id === hid);
+  if (i < 0) return null;
+  return h.slice(i + 1).find((x) => x.key === h[i].key) || null;
+}
+function seriesOf(hid) {
+  const h = getHist(), cur = h.find((x) => x.id === hid);
+  return cur ? h.filter((x) => x.key === cur.key && x.ts <= cur.ts).reverse().slice(-10) : [];
+}
+function sparkline(pts) {
+  if (pts.length < 2) return "";
+  const W = 240, Hh = 64, P = 8, xs = (i) => P + i * (W - 2 * P) / (pts.length - 1), ys = (v) => Hh - P - (v / 100) * (Hh - 2 * P);
+  const line = pts.map((p, i) => `${xs(i)},${ys(p.score)}`).join(" ");
+  return `<svg class="spark" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="匹配度变化：${pts.map((p) => p.score).join("、")}">
+    <polyline points="${line}" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${pts.map((p, i) => `<circle cx="${xs(i)}" cy="${ys(p.score)}" r="${i === pts.length - 1 ? 4 : 3}" fill="${i === pts.length - 1 ? "var(--primary)" : "#fff"}" stroke="var(--primary)" stroke-width="2"><title>${fmtDate(p.ts)}：${p.score}</title></circle>`).join("")}</svg>`;
+}
+function compareCard(d) {
+  const prev = S.hid ? previousOf(S.hid) : null;
+  if (!prev) return `<div class="card compare first">${I("info")}<span>这是你对这个岗位的第一次诊断，已保存为基线。按 30 天计划执行后再来复诊，这里会显示前后对比。</span><button type="button" class="linkish" data-action="history">诊断记录</button></div>`;
+  const old = {}; (prev.d.requirements || []).forEach((r) => { old[r.item] = r.status; });
+  const up = [], down = [], still = [];
+  d.requirements.forEach((r) => {
+    if (!(r.item in old)) return;
+    const a = RANK[old[r.item]], b = RANK[r.status];
+    if (b > a) up.push([r, old[r.item]]); else if (b < a) down.push([r, old[r.item]]); else if (r.status === "缺少") still.push(r);
+  });
+  const delta = d.match_score - prev.score, sign = delta > 0 ? "+" : "";
+  const li = ([r, was]) => `<li><span>${esc(r.item)}</span><em>${esc(was)} → ${esc(r.status)}</em></li>`;
+  return `<div class="card compare">
+    <div class="cmp-top">
+      <div><h3>${I("refresh")}与上次诊断对比</h3><p class="muted small">上次：${fmtDate(prev.ts)} · 本次：${fmtDate(getHist().find((x) => x.id === S.hid)?.ts || Date.now())}</p></div>
+      <button type="button" class="btn btn-default btn-sm" data-action="history">${I("calendar")}全部诊断记录</button>
+    </div>
+    <div class="cmp-body">
+      <div class="cmp-score"><span class="num">${prev.score}</span>${I("arrow")}<b class="num">${d.match_score}</b><span class="delta ${delta > 0 ? "up" : delta < 0 ? "down" : ""}">${delta === 0 ? "持平" : sign + delta}</span></div>
+      ${sparkline(seriesOf(S.hid))}
+    </div>
+    <div class="cmp-lists">
+      <div><h4 class="c-have">已提升 ${up.length} 条</h4>${up.length ? `<ul>${up.map(li).join("")}</ul>` : `<p class="muted small">暂无</p>`}</div>
+      <div><h4 class="c-miss">仍然缺少 ${still.length} 条</h4>${still.length ? `<ul>${still.map((r) => `<li><span>${esc(r.item)}</span></li>`).join("")}</ul>` : `<p class="muted small">没有了，很棒</p>`}</div>
+      ${down.length ? `<div><h4 class="c-part">有所下降 ${down.length} 条</h4><ul>${down.map(li).join("")}</ul><p class="muted small">可能是简历这次没写到，检查一下是否遗漏。</p></div>` : ""}
+    </div>
+    ${prev.d.source?.type === "job" ? "" : `<p class="muted small">提示：粘贴招聘信息时，两次拆出的要求可能不完全相同，只对比了文字一致的条目。</p>`}
+  </div>`;
+}
+function historySheet() {
+  const h = getHist();
+  const rows = h.map((x) => { const p = previousOf(x.id), dl = p ? x.score - p.score : null;
+    return `<tr class="${x.id === S.hid ? "cur" : ""}"><td>${fmtDate(x.ts)}</td><td>${esc(x.title)}</td><td class="num"><b>${x.score}</b>${dl == null ? "" : ` <span class="delta ${dl > 0 ? "up" : dl < 0 ? "down" : ""}">${dl > 0 ? "+" : ""}${dl}</span>`}</td>
+      <td class="right">${x.id === S.hid ? `<span class="muted small">当前</span>` : `<button type="button" class="linkish" data-view="${x.id}">查看</button>`}</td></tr>`; }).join("");
+  openSheet(`<p class="eyebrow">诊断记录</p><h3 class="sheet-title">我的诊断记录</h3>
+    <p class="muted small">最多保留最近 20 次，只保存在这台设备的浏览器里，不会上传到服务器。</p>
+    ${h.length ? `<table class="spec hist"><thead><tr><th>时间</th><th>岗位</th><th>匹配度</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : `<div class="need">${I("file")}<p>还没有诊断记录</p></div>`}
+    ${h.length ? `<div class="sheet-actions"><button type="button" class="btn btn-default" id="btnClearHist">清除全部记录</button></div>` : ""}`);
+  $$("[data-view]", $("#sheetBody")).forEach((b) => b.addEventListener("click", () => {
+    const x = getHist().find((y) => y.id === b.dataset.view); if (!x) return;
+    S.hid = x.id; S.diagnosis = x.d; S.filter = "全部"; store.set("hid", x.id); store.set("diagnosis", x.d);
+    closeSheet(); location.hash = "#/app/diagnose"; renderDiagnosis(); syncSteps(); toast(`正在查看 ${fmtDate(x.ts)} 的诊断`);
+  }));
+  const c = $("#btnClearHist"); if (c) c.addEventListener("click", () => { store.set("dx_history", []); if (S.diagnosis) S.hid = saveHistory(S.diagnosis); store.set("hid", S.hid); closeSheet(); renderDiagnosis(); toast("已清除历史记录，只保留当前这次"); });
+}
+
 /* ------------------------------------------------------------------ diagnose */
 const SAMPLE_RESUME = `【示例简历 · 人物为虚构】
 姓名：小林    电话：13800001234
@@ -386,13 +484,14 @@ $("#btnDiagnose").addEventListener("click", (e) => {
   if (S.mode === "job" && !S.job) return toast("请先从岗位库选择目标岗位，或切换到“粘贴招聘”", true);
   if (S.mode === "paste" && jd.length < 20) return toast("招聘信息至少 20 字", true);
   const body = S.mode === "job" ? { resume, job_id: S.job.id } : { resume, jd };
-  $("#diagResult").innerHTML = skeleton("正在逐条对照岗位要求，通常需要 10～40 秒…");
+  $("#diagResult").innerHTML = skeleton("正在逐条对照岗位要求，通常需要 10～40 秒", ["隐藏手机号等个人信息", "读取岗位要求与参考资料", "模型逐条判断简历", "程序核验依据并计算匹配度"], 5);
   $("#diagResult").scrollIntoView({ behavior: "smooth", block: "start" });
   busy(e.currentTarget, "诊断中", async () => {
     const d = await api("/api/diagnose", body);
-    S.diagnosis = d; S.plan = null; S.done = {}; S.filter = "全部"; S.selDay = null;
-    store.set("diagnosis", d); store.set("plan", null); store.set("done", {});
-    renderDiagnosis(); syncSteps();
+    S.diagnosis = d; S.filter = "全部"; S.selDay = null;
+    S.hid = saveHistory(d); store.set("hid", S.hid);   // the previous 30-day plan and its progress are kept
+    store.set("diagnosis", d);
+    renderDiagnosis(); syncSteps(); if (S.plan) renderPlan();
   }).then(() => { if ($("#diagResult .skeleton")) { if (S.diagnosis) renderDiagnosis(); else $("#diagResult").innerHTML = ""; } });
 });
 
@@ -419,15 +518,16 @@ function renderDiagnosis() {
       <div class="report-actions"><button class="btn btn-default btn-sm" type="button" data-action="print">${I("printer")}打印报告</button></div>
     </div>
     <div class="stat-row">
-      <div class="stat stat-score"><div class="gauge"><svg viewBox="0 0 136 136"><circle class="trk" cx="68" cy="68" r="58"/><circle class="val" cx="68" cy="68" r="58" stroke="${color}" style="stroke-dasharray:364.4;stroke-dashoffset:364.4"/></svg></div><div><span>匹配度</span><b class="num">${s}<small>/100</small></b></div></div>
-      <div class="stat"><span>具备</span><b class="num c-have">${c["具备"]}</b></div>
-      <div class="stat"><span>部分具备</span><b class="num c-part">${c["部分具备"]}</b></div>
-      <div class="stat"><span>缺少</span><b class="num c-miss">${c["缺少"]}</b></div>
-      <div class="stat"><span>必需项缺口</span><b class="num ${d.must_gaps ? "c-miss" : ""}">${d.must_gaps || 0}</b></div>
+      <div class="stat stat-score"><div class="gauge"><svg viewBox="0 0 136 136"><circle class="trk" cx="68" cy="68" r="58"/><circle class="val" cx="68" cy="68" r="58" stroke="${color}" style="stroke-dasharray:364.4;stroke-dashoffset:364.4"/></svg></div><div><span>匹配度</span><b class="num" data-count="${s}">${s}<small>/100</small></b></div></div>
+      <div class="stat"><span>具备</span><b class="num c-have" data-count="${c["具备"]}">${c["具备"]}</b></div>
+      <div class="stat"><span>部分具备</span><b class="num c-part" data-count="${c["部分具备"]}">${c["部分具备"]}</b></div>
+      <div class="stat"><span>缺少</span><b class="num c-miss" data-count="${c["缺少"]}">${c["缺少"]}</b></div>
+      <div class="stat"><span>必需项缺口</span><b class="num ${d.must_gaps ? "c-miss" : ""}" data-count="${d.must_gaps || 0}">${d.must_gaps || 0}</b></div>
     </div>
     <div class="stack" aria-hidden="true"><i style="width:${c["具备"] / n * 100}%;background:var(--have)"></i><i style="width:${c["部分具备"] / n * 100}%;background:var(--part)"></i><i style="width:${c["缺少"] / n * 100}%;background:var(--miss)"></i></div>
     <p class="method">${I("info")}匹配度按具备 1 分、部分具备 0.5 分、缺少 0 分计算，必需项权重 2、加分项权重 1，由程序计算${hidden ? `；已自动隐藏 ${esc(hidden)}` : ""}${d.unverified_evidence ? `；${d.unverified_evidence} 条模型依据在简历中找不到原文，已降级` : ""}</p>
   </div>
+  ${compareCard(d)}
   <div class="report-grid">
     <div class="card table-card">
       <div class="card-head"><h3>逐条对照 <small>${n} 条</small></h3>
@@ -460,8 +560,10 @@ function renderDiagnosis() {
     <a href="#/app/interview">${I("mic")}<span><b>针对短板模拟面试</b><small>5 道题 · 五维评分</small></span></a>
   </div>
   <div class="card" style="margin-top:24px">${feedback("diagnose")}<p class="meta">用时 ${(d.elapsed_ms / 1000).toFixed(1)} 秒</p></div>`;
-  $$(".filter", $("#diagResult")).forEach((b) => b.addEventListener("click", () => { S.filter = b.dataset.f; renderDiagnosis(); }));
+  $$(".filter", $("#diagResult")).forEach((b) => b.addEventListener("click", () => { S.filter = b.dataset.f; renderDiagnosis.quiet = true; renderDiagnosis(); stagger($$("#diagResult .rt-row:not(.rt-head)")); }));
   const sj = $("#btnSrcJob"); if (sj) sj.addEventListener("click", () => openJob(so.id));
+  if (!renderDiagnosis.quiet) { countUp($("#diagResult")); stagger($$("#diagResult .rt-row:not(.rt-head)")); stagger($$("#diagResult .report-grid > *, #diagResult .next"), 60); }
+  renderDiagnosis.quiet = false;
   const sh = $("#btnShare"); if (sh) sh.addEventListener("click", () => contribute($("#jd").value.trim()));
   requestAnimationFrame(() => requestAnimationFrame(() => { const v = $("#diagResult .gauge .val"); if (v) v.style.strokeDashoffset = 364.4 * (1 - s / 100); }));
 }
@@ -469,10 +571,10 @@ function renderDiagnosis() {
 /* ------------------------------------------------------------------ 30-day plan */
 $("#hours").addEventListener("input", (e) => { $("#hoursVal").textContent = e.target.value; });
 $("#btnPlan").addEventListener("click", (e) => {
-  $("#planResult").innerHTML = skeleton("AI 正在设计学习模块，程序随后排进 30 天日历，通常需要 20～60 秒…");
+  $("#planResult").innerHTML = skeleton("正在生成 30 天计划，通常需要 1～2 分钟", ["整理需要补的差距项", "模型设计学习模块和每日任务", "程序排进 30 天日历并检查时长"], 15);
   busy(e.currentTarget, "规划中", async () => {
     const p = await api("/api/plan", { diagnosis: S.diagnosis, daily_hours: +$("#hours").value });
-    S.plan = p; S.done = {}; S.selDay = null; store.set("plan", p); store.set("done", {}); renderPlan(); syncSteps();
+    p.hid = S.hid; S.plan = p; S.done = {}; S.selDay = null; store.set("plan", p); store.set("done", {}); renderPlan(true); syncSteps();
   }).then(() => { if ($("#planResult .skeleton")) { if (S.plan) renderPlan(); else $("#planResult").innerHTML = ""; } });
 });
 const DTYPE = { "学习": "t-learn", "复盘": "t-review", "项目": "t-project", "面试": "t-iv" };
@@ -489,13 +591,15 @@ function taskRow(t) {
     <span><span class="t">${esc(t.title)}</span><span class="c">完成标准：${esc(t.output)}</span>${t.tools?.length ? `<span class="tt">${t.tools.map((x) => `<em>${esc(x)}</em>`).join("")}</span>` : ""}</span>
     <span class="h">${t.minutes} 分</span></label>`;
 }
-function renderPlan() {
+function renderPlan(animate = false) {
   const p = S.plan; if (!p || !p.days) return;
   const all = p.days.flatMap((d) => d.tasks), done = all.filter((t) => S.done[t.id]).length;
   if (!S.selDay) S.selDay = (p.days.find((d) => !dayDone(d)) || p.days[0]).day;
   const sel = p.days.find((d) => d.day === S.selDay) || p.days[0];
   const doneDays = p.days.filter(dayDone).length;
+  const based = p.hid && p.hid !== S.hid ? getHist().find((x) => x.id === p.hid) : null;
   $("#planResult").innerHTML = `
+  ${based || (p.hid && p.hid !== S.hid) ? `<div class="key-hint">${I("info")}<span>这份计划基于 ${based ? fmtDate(based.ts) : "之前"} 的诊断（匹配度 ${based ? based.score : "—"}），你已经重新诊断过。打勾进度会保留；想按新结果调整，可以在上方重新生成计划。</span></div>` : ""}
   <div class="card">
     <div class="plan-summary">
       <div><p class="eyebrow">${esc(p.job_title || S.diagnosis?.job_title || "")}${p.demo ? " · 演示模式" : ""}</p><h3 class="report-title" style="margin:0">30 天 · 每天不超过 ${fmtMin(p.daily_minutes)}</h3></div>
@@ -534,8 +638,10 @@ function renderPlan() {
     ${p.tips?.length ? `<h3>${I("bulb")}执行建议</h3><div class="tips">${p.tips.map((x) => `<div class="tip">${I("check")}<span>${esc(x)}</span></div>`).join("")}</div>` : ""}
     ${feedback("plan")}
   </div>`;
-  $$("#planResult .day").forEach((b) => b.addEventListener("click", () => { S.selDay = +b.dataset.day; renderPlan(); $("#planResult .day-detail").scrollIntoView({ behavior: "smooth", block: "nearest" }); }));
-  $$("#planResult [data-step]").forEach((b) => b.addEventListener("click", () => { S.selDay = Math.max(1, Math.min(30, sel.day + +b.dataset.step)); renderPlan(); }));
+  const showDay = (d) => { S.selDay = d; renderPlan(); stagger($$("#planResult .day-detail .task"), 40); };
+  $$("#planResult .day").forEach((b) => b.addEventListener("click", () => { showDay(+b.dataset.day); $("#planResult .day-detail").scrollIntoView({ behavior: "smooth", block: "nearest" }); }));
+  $$("#planResult [data-step]").forEach((b) => b.addEventListener("click", () => showDay(Math.max(1, Math.min(30, sel.day + +b.dataset.step)))));
+  if (animate) { stagger($$("#planResult .cal .day"), 15, 30); stagger($$("#planResult .skill"), 40); stagger($$("#planResult > .card"), 60); }
   $$("#planResult .task input").forEach((cb) => cb.addEventListener("change", () => { S.done[cb.dataset.k] = cb.checked; store.set("done", S.done); renderPlan(); }));
 }
 
@@ -618,7 +724,8 @@ function syncSteps() {
   const has = !!S.diagnosis;
   $("#st-jobs").textContent = S.job ? `已选：${S.job.title.length > 11 ? S.job.title.slice(0, 11) + "…" : S.job.title}` : "第一步";
   $("#st-jobs").classList.toggle("done", !!S.job);
-  $("#st-diagnose").textContent = has ? `已完成 · 匹配度 ${S.diagnosis.match_score}` : S.job || S.mode === "paste" ? "可以开始" : "选好岗位后";
+  const pv = has && S.hid ? previousOf(S.hid) : null, dlt = pv ? S.diagnosis.match_score - pv.score : 0;
+  $("#st-diagnose").textContent = has ? `已完成 · 匹配度 ${S.diagnosis.match_score}${pv && dlt ? `（${dlt > 0 ? "+" : ""}${dlt}）` : ""}` : S.job || S.mode === "paste" ? "可以开始" : "选好岗位后";
   $("#st-diagnose").classList.toggle("done", has);
   $("#st-plan").textContent = S.plan ? "已生成" : has ? "可以开始" : "需先诊断";
   $("#st-plan").classList.toggle("done", !!S.plan);
@@ -629,9 +736,15 @@ function syncSteps() {
   ivProgress();
 }
 
+document.addEventListener("keydown", (e) => {   // "/" jumps to the search box on the job / ask pages
+  if (e.key !== "/" || e.target.closest("input, textarea, select")) return;
+  const box = $("#pane-jobs.active #jobQ") || $("#pane-ask.active #question");
+  if (box) { e.preventDefault(); box.focus(); }
+});
 document.addEventListener("click", (e) => {
   if (e.target.closest("[data-action=print]")) window.print();
   if (e.target.closest("[data-action=key]")) keySheet();
+  if (e.target.closest("[data-action=history]")) historySheet();
 });
 
 /* ------------------------------------------------------------------ boot */
@@ -639,6 +752,7 @@ if (S.plan && !S.plan.days) {
   store.set('legacy_plan', { plan: S.plan, done: S.done });
   S.plan = null; S.done = {}; store.set('plan', null); store.set('done', {});
 }   // drop plans saved by the old 4-week version
+if (S.diagnosis && !getHist().some((x) => x.id === S.hid)) { S.hid = saveHistory(S.diagnosis); store.set("hid", S.hid); }
 hydrateIcons(); count(); renderTarget(); syncSteps(); loadMajors();
 if (S.diagnosis) renderDiagnosis();
 if (S.plan) renderPlan();
