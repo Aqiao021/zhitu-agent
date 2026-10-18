@@ -136,11 +136,13 @@ function route() {
   const [path, query] = h.split("?");
   const parts = path.split("/").filter(Boolean);
   const view = parts[0] === "app" ? "app" : parts[0] === "about" ? "about" : "home";
+  document.documentElement.setAttribute("data-rv", view);
   $$(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + view));
   $$(".nav-links a").forEach((a) => a.classList.toggle("active", a.dataset.route === view));
   document.body.classList.toggle("in-app", view === "app");
   if (view === "app") {
     const tab = TABS.includes(parts[1]) ? parts[1] : "jobs";
+    document.documentElement.setAttribute("data-rt", tab);
     $$(".pane").forEach((p) => p.classList.toggle("active", p.id === "pane-" + tab));
     $$(".side-item").forEach((a) => a.classList.toggle("active", a.dataset.tab === tab));
     if (query && query.includes("sample=1") && !$("#resume").value) loadSample();
@@ -150,7 +152,7 @@ function route() {
   }
   window.scrollTo({ top: 0 });
 }
-window.addEventListener("hashchange", route);
+window.addEventListener("hashchange", () => { document.documentElement.classList.add("nav"); route(); });
 window.addEventListener("scroll", () => $("#nav").classList.toggle("scrolled", window.scrollY > 8), { passive: true });
 
 /* reveal on scroll — content stays visible if the observer never fires */
@@ -929,6 +931,13 @@ $("#askForm").addEventListener("submit", (e) => {
 const LINE = { blue: "#165DFF", cyan: "#14C9C9", orange: "#FF7D00", purple: "#722ED1", green: "#00B42A", gold: "#FFC56B" };
 function heroMap() {
   const el = $("#heroMap"); if (!el) return;
+  // the illustration is in the HTML from the start (no swap, no layout jump); the drawn map is only a fallback
+  const art = $("#heroArt"), hero = $(".hero-dark");
+  if (art && art.getAttribute("src") && !(art.complete && !art.naturalWidth)) {
+    art.addEventListener("error", () => { art.classList.add("hidden"); hero.classList.remove("has-art"); heroMap(); }, { once: true });
+    return;
+  }
+  art?.classList.add("hidden"); hero?.classList.remove("has-art");
   // four lines that meet at an interchange; labels are steps and real skills from the job library
   const lines = [
     { c: LINE.blue, d: "M20 300 H180 Q220 300 240 270 L300 180 Q320 150 360 150 H560", st: [[20, 300, "现在的你"], [120, 300, "找岗位"], [270, 225, "差距诊断", 0, -52, 22], [420, 150, "30 天计划"], [560, 150, "目标岗位", 1]] },
@@ -946,8 +955,6 @@ function heroMap() {
     <circle cx="270" cy="225" r="16" class="hm-hub"/>${stations}
     <g class="hm-train"><circle r="6" fill="#fff"><animateMotion dur="7s" repeatCount="indefinite" rotate="auto" path="${lines[0].d}"/></circle></g>
   </svg>`;
-  const art = $("#heroArt");   // optional illustration: set data-src on #heroArt in index.html
-  if (art && art.dataset.src) { const img = new Image(); img.onload = () => { art.src = img.src; art.classList.remove("hidden"); $(".hero-dark").classList.add("has-art"); }; img.src = art.dataset.src; }
 }
 function routeMap(d) {   // the diagnosis drawn as a line: each requirement is a station on the way to the job
   const reqs = [...d.requirements].sort((a, b) => RANK[b.status] - RANK[a.status] || (a.level === "必需" ? -1 : 1));

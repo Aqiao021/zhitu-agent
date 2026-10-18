@@ -43,6 +43,19 @@ class PagesBuildTest(unittest.TestCase):
             self.assertTrue({"hero-illustration.jpg", "train.png", "empty-job.png", "empty-search.png", "empty-done.png"} <= image_names)
             self.assertIn('id="heroMap"', html)
             self.assertIn('data-src="img/hero-illustration.jpg"', html)
+            # first paint: view picked before any other script, illustration requested by the HTML itself
+            self.assertTrue((out / "boot.js").is_file())
+            self.assertLess(html.index('<script src="boot.js">'), html.index('</head>'))
+            self.assertIn('src="img/hero-illustration.jpg"', html)
+
+    def test_home_counts_match_library(self):
+        # the numbers are in the HTML so the first frame is right; they must not drift from the data
+        import re
+        html = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
+        jobs = json.loads((ROOT / "kb" / "jobs.json").read_text(encoding="utf-8"))
+        docs = [p for p in (ROOT / "kb").glob("*.md")]
+        shown = {k: int(re.search(rf'id="{k}">(\d+)<', html).group(1)) for k in ("majorCount", "jobCount", "docCount")}
+        self.assertEqual(shown, {"majorCount": len(jobs["majors"]), "jobCount": len(jobs["jobs"]), "docCount": len(docs)})
 
 
 if __name__ == "__main__":
