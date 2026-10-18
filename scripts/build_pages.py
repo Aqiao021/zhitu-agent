@@ -15,7 +15,8 @@ from zhitu.jobs import normalize
 from zhitu.userkey import PROVIDERS
 
 ASSETS = ("index.html", "stats.html", "app.js", "stats.js", "browser-client.js", "browser-ui.js", "styles.css",
-          "favicon.ico", "favicon.svg", "apple-touch-icon.png", "logo-512.png", "og-cover.jpg", "img/hero-app.jpg")
+          "favicon.ico", "favicon.svg", "apple-touch-icon.png", "logo-512.png", "og-cover.jpg", "img/hero-app.jpg", "img/cover-bg.jpg", "img/empty-done.png", "img/empty-job.png",
+          "img/empty-search.png", "img/hero-illustration.jpg", "img/train.png")
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
        "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https:; "
        "object-src 'none'; base-uri 'self'; form-action 'self'")

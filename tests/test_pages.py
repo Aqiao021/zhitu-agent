@@ -37,6 +37,10 @@ class PagesBuildTest(unittest.TestCase):
             self.assertEqual(deepseek["model"], "deepseek-chat")
             self.assertIn('<script src="browser-client.js">', html)
             self.assertIn('href="stats.html"', html)
+            image_names = {p.name for p in (out / "img").iterdir()}
+            self.assertTrue({"hero-illustration.jpg", "train.png", "empty-job.png", "empty-search.png", "empty-done.png"} <= image_names)
+            self.assertIn('id="heroMap"', html)
+            self.assertIn('data-src="img/hero-illustration.jpg"', html)
 
 
 if __name__ == "__main__":

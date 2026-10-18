@@ -294,7 +294,7 @@ async function searchJobs() {
         <span class="jc-majors">${j.majors.map((m) => `<i>${esc(m)}</i>`).join("")}</span>
         <span class="jc-tools">${j.tools.map((t) => `<em>${esc(t)}</em>`).join("")}</span>
         <span class="jc-foot"><span>必需 ${j.must} 条 · 共 ${j.total} 条要求</span><span class="jc-go">查看要求${I("arrow")}</span></span>
-      </div>`).join("") || `<div class="need">${I("search")}<p>没有找到相关岗位，换个关键词试试，或者切换到“粘贴招聘”直接诊断。</p></div>`;
+      </div>`).join("") || `<div class="need"><img class="empty-img" src="img/empty-search.png" alt="" width="360" height="275"><p>没有找到相关岗位，换个关键词试试，或者切换到“粘贴招聘”直接诊断。</p></div>`;
     $$("#jobResults .job-card").forEach((b) => {
       b.addEventListener("click", (e) => { const pb = e.target.closest("[data-pick]"); if (pb) return togglePick(pb.dataset.pick, pb.dataset.title); openJob(b.dataset.id); });
       b.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === b) { e.preventDefault(); openJob(b.dataset.id); } });
@@ -372,6 +372,7 @@ async function commonSheet(ids) {
     <h3 class="sheet-title">${n} 个岗位的共同要求</h3>
     <p class="muted small">${c.combo.jobs.map((j) => esc(j.title)).join("、")}</p>
     <div class="combo-kpis"><div><b class="num">${c.combo.shared}</b><span>项要求全部 ${n} 个岗位都有</span></div><div><b class="num">${c.requirements.length}</b><span>项要求至少 2 个岗位都有</span></div></div>
+    <h4>${I("layers")}岗位 × 要求热力图</h4>${heatmap(c)}
     <h4>${I("check")}共同要求排行（按出现的岗位数）</h4>
     <ul class="common-list">${c.requirements.map((r) => `<li>
       <div class="cl-top"><span class="lvl ${r.level === "必需" ? "lvl-must" : "lvl-plus"}">${esc(r.level)}</span><b>${esc(r.item)}</b></div>
@@ -481,7 +482,7 @@ function renderTarget() {
       <p class="muted small">必需 ${j.must} 条 · 共 ${j.total} 条要求，将逐条对照你的简历</p>
       <div class="jc-tools">${(j.tools || []).map((t) => `<em>${esc(t)}</em>`).join("")}</div>
       <div class="pj-actions"><button type="button" class="btn btn-ghost btn-sm" id="btnViewJob">${I("file")}查看要求</button><a class="btn btn-ghost btn-sm" href="#/app/jobs">${I("refresh")}更换岗位</a></div></div>`
-    : `<div class="need small-need">${I("briefcase")}<p>还没有选择目标岗位</p><a class="btn btn-primary btn-sm" href="#/app/jobs">去岗位库选择</a><button type="button" class="linkish" data-m2="paste">或者粘贴一条招聘信息</button></div>`;
+    : `<div class="need small-need"><img class="empty-img sm" src="img/empty-job.png" alt="" width="360" height="212"><p>还没有选择目标岗位</p><a class="btn btn-primary btn-sm" href="#/app/jobs">去岗位库选择</a><button type="button" class="linkish" data-m2="paste">或者粘贴一条招聘信息</button></div>`;
   const v = $("#btnViewJob"); if (v) v.addEventListener("click", () => openJob(j.id));
   const p = $("#targetJob [data-m2]"); if (p) p.addEventListener("click", () => setMode("paste"));
 }
@@ -646,6 +647,7 @@ function renderDiagnosis() {
       <div class="stat"><span>必需项缺口</span><b class="num ${d.must_gaps ? "c-miss" : ""}" data-count="${d.must_gaps || 0}">${d.must_gaps || 0}</b></div>
     </div>
     <div class="stack" aria-hidden="true"><i style="width:${c["具备"] / n * 100}%;background:var(--have)"></i><i style="width:${c["部分具备"] / n * 100}%;background:var(--part)"></i><i style="width:${c["缺少"] / n * 100}%;background:var(--miss)"></i></div>
+    <div class="route-card"><div class="route-head"><b>${I("layers")}职途地图</b><small>${c["具备"]} / ${n} 站已点亮</small></div>${routeMap(d)}</div>
     <p class="method">${I("info")}匹配度按具备 1 分、部分具备 0.5 分、缺少 0 分计算，必需项权重 2、加分项权重 1，由程序计算${hidden ? `；已自动隐藏 ${esc(hidden)}` : ""}${d.unverified_evidence ? `；${d.unverified_evidence} 条模型依据在简历中找不到原文，已降级` : ""}</p>
   </div>
   ${compareCard(d)}
@@ -734,6 +736,7 @@ function renderPlan(animate = false) {
       <div class="progress"><div class="progress-bar"><i style="width:${all.length ? done / all.length * 100 : 0}%"></i></div><small>已完成 ${done} / ${all.length} 项任务 · ${doneDays} 天全部完成（进度只保存在这台设备上）</small></div>
       <button class="btn btn-ghost btn-sm" type="button" data-action="print">${I("printer")}打印 / 存为 PDF</button>
     </div>
+    ${planRoute(p)}
   </div>
   <div class="card">
     <h3>${I("layers")}这 30 天要学会的软件和技能</h3>
@@ -745,6 +748,7 @@ function renderPlan(animate = false) {
       ${p.certificates.length ? `<div class="tip">${I("award")}<span><b>可以开始准备的证书（加分项，不承诺拿证）</b><br>${p.certificates.map(esc).join("<br>")}</span></div>` : ""}
     </div>
   </div>
+  ${doneDays === 30 ? `<div class="card done-card"><img src="img/empty-done.png" alt="" width="360" height="145"><div><h3>30 天全部完成，到站了！</h3><p class="muted">现在去重新诊断一次，看看职途地图上新点亮了哪些站，再做一轮模拟面试。</p><div class="pj-actions"><a class="btn btn-primary btn-sm" href="#/app/diagnose">重新诊断</a><a class="btn btn-default btn-sm" href="#/app/interview">模拟面试</a></div></div></div>` : ""}
   <div class="card no-print">
     <div class="cal-head"><h3>${I("calendar")}30 天日历</h3><div class="cal-legend"><span class="t-learn">学习</span><span class="t-review">复盘</span><span class="t-project">项目</span><span class="t-iv">面试</span></div></div>
     <div class="cal" role="list">${p.days.map((d) => `<button type="button" role="listitem" class="day ${DTYPE[d.type] || ""} ${d.day === sel.day ? "sel" : ""} ${dayDone(d) ? "ok" : ""}" data-day="${d.day}" aria-label="第 ${d.day} 天 ${esc(d.theme)}">
@@ -847,6 +851,72 @@ $("#askForm").addEventListener("submit", (e) => {
   }).then(() => { if ($("#askResult .skeleton")) $("#askResult").innerHTML = ""; });
 });
 
+/* ------------------------------------------------------------------ 职途地图: route-map visuals */
+const LINE = { blue: "#165DFF", cyan: "#14C9C9", orange: "#FF7D00", purple: "#722ED1", green: "#00B42A", gold: "#FFC56B" };
+function heroMap() {
+  const el = $("#heroMap"); if (!el) return;
+  // four lines that meet at an interchange; labels are steps and real skills from the job library
+  const lines = [
+    { c: LINE.blue, d: "M20 300 H180 Q220 300 240 270 L300 180 Q320 150 360 150 H560", st: [[20, 300, "现在的你"], [120, 300, "找岗位"], [270, 225, "差距诊断", 0, -52, 22], [420, 150, "30 天计划"], [560, 150, "目标岗位", 1]] },
+    { c: LINE.cyan, d: "M60 60 Q140 60 180 110 L270 225 Q300 262 350 262 H540", st: [[60, 60, "Python"], [150, 85, "Excel"], [430, 262, "作品集"], [540, 262, "实习"]] },
+    { c: LINE.orange, d: "M120 400 Q200 400 230 360 L270 225 Q290 190 300 120 L310 40", st: [[120, 400, "PLC"], [215, 380, "剪映"], [306, 70, "Linux", 0, 30, 20]] },
+    { c: LINE.purple, d: "M560 380 H420 Q380 380 360 350 L300 262 Q280 232 270 225", st: [[560, 380, "模拟面试"], [460, 380, "复诊"]] },
+  ];
+  const paths = lines.map((l, i) => `<path class="hm-line" d="${l.d}" stroke="${l.c}" style="--d:${i * 0.25}s"/><path class="hm-flow" d="${l.d}" stroke="${l.c}"/>`).join("");
+  const stations = lines.flatMap((l, i) => l.st.map(([x, y, t, end, dx = 0, dy], k) => `<g class="hm-st ${end ? "end" : ""}" style="--d:${0.6 + i * 0.2 + k * 0.12}s">
+      <circle cx="${x}" cy="${y}" r="${end ? 11 : 7}" fill="${end ? LINE.gold : "#0B1B33"}" stroke="${end ? LINE.gold : l.c}" stroke-width="3"/>
+      <text x="${x + dx}" y="${y + (dy ?? (y > 300 ? 28 : -16))}" text-anchor="middle">${t}</text></g>`)).join("");
+  el.innerHTML = `<svg viewBox="0 0 600 440" role="img" aria-label="职途地图：从现在的你，经过找岗位、差距诊断、30 天计划，到达目标岗位">
+    <defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <g filter="url(#glow)">${paths}</g>
+    <circle cx="270" cy="225" r="16" class="hm-hub"/>${stations}
+    <g class="hm-train"><circle r="6" fill="#fff"><animateMotion dur="7s" repeatCount="indefinite" rotate="auto" path="${lines[0].d}"/></circle></g>
+  </svg>`;
+  const art = $("#heroArt");   // optional illustration: set data-src on #heroArt in index.html
+  if (art && art.dataset.src) { const img = new Image(); img.onload = () => { art.src = img.src; art.classList.remove("hidden"); $(".hero-dark").classList.add("has-art"); }; img.src = art.dataset.src; }
+}
+function routeMap(d) {   // the diagnosis drawn as a line: each requirement is a station on the way to the job
+  const reqs = [...d.requirements].sort((a, b) => RANK[b.status] - RANK[a.status] || (a.level === "必需" ? -1 : 1));
+  const n = reqs.length, W = Math.max(720, 90 * (n + 1)), H = 190, x0 = 50, x1 = W - 60, step = (x1 - x0) / (n + 1), y = 96;
+  const firstGap = reqs.findIndex((r) => r.status !== "具备");
+  const trainX = firstGap < 0 ? x1 : x0 + step * (firstGap + 0.5);
+  const st = reqs.map((r, i) => {
+    const x = x0 + step * (i + 1), up = i % 2 === 0, cls = r.status === "具备" ? "on" : r.status === "部分具备" ? "half" : "off";
+    const label = r.item.length > 8 ? r.item.slice(0, 8) + "…" : r.item;
+    return `<g class="rm-st ${cls}" style="--d:${0.15 + i * 0.07}s"><title>${esc(r.item)}：${esc(r.status)}</title>
+      <line x1="${x}" y1="${y}" x2="${x}" y2="${up ? y - 26 : y + 26}" class="rm-tick"/>
+      <circle cx="${x}" cy="${y}" r="9"/>${cls === "half" ? `<path d="M${x} ${y - 9} A9 9 0 0 1 ${x} ${y + 9} Z" class="rm-halffill"/>` : ""}
+      <text x="${x}" y="${up ? y - 34 : y + 44}" text-anchor="middle">${esc(label)}</text></g>`;
+  }).join("");
+  const doneX = firstGap < 0 ? x1 : x0 + step * (firstGap + (firstGap === 0 ? 0 : 0.5));
+  return `<div class="route-wrap"><svg class="route-map" viewBox="0 0 ${W} ${H}" style="min-width:${Math.min(W, 980)}px" role="img" aria-label="职途地图：${reqs.filter((r) => r.status === "具备").length} 站已点亮，共 ${n} 站">
+    <line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" class="rm-track"/>
+    <line x1="${x0}" y1="${y}" x2="${doneX}" y2="${y}" class="rm-done"/>
+    <g class="rm-start"><circle cx="${x0}" cy="${y}" r="12"/><text x="${x0}" y="${y + 44}" text-anchor="middle">现在的你</text></g>
+    ${st}
+    <g class="rm-end"><rect x="${x1 - 14}" y="${y - 14}" width="28" height="28" rx="6"/><text x="${x1}" y="${y - 30}" text-anchor="middle">目标岗位</text></g>
+    <g class="rm-train" style="--tx:${trainX}px"><image href="img/train.png" x="-36" y="${y - 17}" width="72" height="34"/></g>
+  </svg></div>
+  <div class="route-legend"><span class="on">已点亮（具备）</span><span class="half">半亮（部分具备）</span><span class="off">待点亮（缺少）</span><span class="tr">小车停在第一个需要补的站</span></div>`;
+}
+function planRoute(p) {   // 30 stations; the train sits on the first unfinished day
+  const W = 960, y = 30, x0 = 16, step = (W - 32) / 29;
+  const cur = (p.days.find((d) => !dayDone(d)) || p.days[29]).day;
+  const dots = p.days.map((d, i) => { const x = x0 + step * i, done = dayDone(d);
+    return `<circle cx="${x}" cy="${y}" r="${d.type === "学习" ? 4.5 : 6.5}" class="pr-st ${done ? "done" : ""} ${DTYPE[d.type]}"><title>第 ${d.day} 天 · ${d.type} · ${d.theme}</title></circle>`; }).join("");
+  const cx = x0 + step * (cur - 1);
+  return `<svg class="plan-route" viewBox="0 0 ${W} 64" role="img" aria-label="30 天路线：当前第 ${cur} 天">
+    <line x1="${x0}" y1="${y}" x2="${W - 16}" y2="${y}" class="pr-track"/><line x1="${x0}" y1="${y}" x2="${cx}" y2="${y}" class="pr-done"/>${dots}
+    <g class="pr-train" transform="translate(${cx} 0)"><image href="img/train.png" x="-28" y="${y - 13}" width="56" height="26"/></g>
+    <text x="${x0}" y="58">第 1 天</text><text x="${W / 2}" y="58" text-anchor="middle">当前：第 ${cur} 天</text><text x="${W - 16}" y="58" text-anchor="end">第 30 天 · 复诊</text></svg>`;
+}
+function heatmap(c) {   // postings × common requirements
+  const jobs = c.combo.jobs;
+  return `<div class="heat-wrap"><table class="heat"><thead><tr><th></th>${jobs.map((j, i) => `<th title="${esc(j.title)}"><span>${i + 1}</span></th>`).join("")}<th>合计</th></tr></thead>
+    <tbody>${c.requirements.map((r) => { const set = new Set(r.jobs); return `<tr><td class="hl-item" title="${esc(r.item)}">${esc(r.item.length > 16 ? r.item.slice(0, 16) + "…" : r.item)}</td>${jobs.map((j) => `<td class="cell ${set.has(j.title) ? "on" : ""}" title="${esc(j.title)}"></td>`).join("")}<td class="num tot">${r.count}/${jobs.length}</td></tr>`; }).join("")}</tbody></table>
+    <ol class="heat-key">${jobs.map((j, i) => `<li><b>${i + 1}</b>${esc(j.title)}</li>`).join("")}</ol></div>`;
+}
+
 /* ------------------------------------------------------------------ step status */
 function syncSteps() {
   const has = !!S.diagnosis;
@@ -881,7 +951,7 @@ if (S.plan && !S.plan.days) {
   S.plan = null; S.done = {}; store.set('plan', null); store.set('done', {});
 }   // drop plans saved by the old 4-week version
 if (S.diagnosis && !getHist().some((x) => x.id === S.hid)) { S.hid = saveHistory(S.diagnosis); store.set("hid", S.hid); }
-hydrateIcons(); count(); renderTarget(); syncSteps(); loadMajors(); renderTray();
+hydrateIcons(); count(); renderTarget(); syncSteps(); loadMajors(); renderTray(); heroMap();
 if (S.diagnosis) renderDiagnosis();
 if (S.plan) renderPlan();
 route(); setupReveal();

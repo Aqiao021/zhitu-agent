@@ -45,15 +45,17 @@
   <p class="container static-only browser-notice">每位使用者连接自己的模型；Key 仅在当前页面内存中使用，刷新后清除。结果和记录仅保存在本机浏览器，请及时导出备份。</p>
   <!-- ============================================================ HOME -->
   <div class="view" id="view-home">
-    <section class="hero">
+    <section class="hero hero-dark">
+      <div class="hero-grid-bg" aria-hidden="true"></div>
+      <img class="hero-art hidden" id="heroArt" data-src="img/hero-illustration.jpg" alt="" aria-hidden="true">
       <div class="container hero-grid">
         <div class="hero-copy">
-          <p class="hero-tag"><span data-icon="award"></span>漳州职业技术学院 · 人工智能学院 · 学生作品</p>
-          <h1>高职生求职差距诊断平台</h1>
+          <p class="hero-tag"><span class="live-dot"></span>漳州职业技术学院 · 人工智能学院 · 学生作品</p>
+          <h1>规划一条<br><span class="hl-line">通往目标岗位</span>的路线</h1>
           <p class="lead">选定目标岗位，逐条对照岗位要求与个人简历，明确已具备、部分具备和缺少的能力；再按每天可投入的时间，生成 30 天补差计划，并针对短板进行模拟面试。</p>
           <div class="hero-actions">
             <a class="btn btn-primary btn-lg" href="#/app/jobs">进入工作台</a>
-            <a class="btn btn-default btn-lg" href="#/app/diagnose?sample=1">查看示例诊断</a>
+            <a class="btn btn-ghost-dark btn-lg" href="#/app/diagnose?sample=1">查看示例诊断</a>
           </div>
           <dl class="hero-facts">
             <div><dt>覆盖专业</dt><dd><b class="num" id="majorCount">14</b> 个</dd></div>
@@ -61,10 +63,7 @@
             <div><dt>公开资料</dt><dd><b class="num" id="docCount">8</b> 份</dd></div>
           </dl>
         </div>
-        <figure class="hero-shot">
-          <div class="browser"><div class="browser-bar"><i></i><i></i><i></i><span>职途助手 · 工作台</span></div>
-            <img src="img/hero-app.jpg" width="1440" height="760" alt="职途助手工作台：按专业检索岗位画像" loading="eager"></div>
-        </figure>
+        <div class="hero-map" id="heroMap" aria-hidden="true"></div>
       </div>
     </section>
 
@@ -92,6 +91,16 @@
           <a class="feature" href="#/app/plan"><span class="fi" data-icon="calendar"></span><h3>30 天补差计划</h3><p>按每天 1～4 小时排出 30 天日历，包含学习日、复盘日、综合项目和面试日，可逐项打勾。</p><span class="more">生成计划<span data-icon="arrow"></span></span></a>
           <a class="feature" href="#/app/interview"><span class="fi" data-icon="mic"></span><h3>模拟面试</h3><p>围绕短板连续提问并追问细节，结束后按五个维度评分，给出改进建议和回答示范。</p><span class="more">开始面试<span data-icon="arrow"></span></span></a>
         </div>
+      </div>
+    </section>
+
+    <section class="section shot-section">
+      <div class="container">
+        <div class="sec-head"><h2>真实界面</h2><p>工作台：按专业检索岗位、加入海投组合、统计共同要求。</p></div>
+        <figure class="hero-shot">
+          <div class="browser"><div class="browser-bar"><i></i><i></i><i></i><span>职途助手 · 工作台</span></div>
+            <img src="img/hero-app.jpg" width="1440" height="760" alt="职途助手工作台：按专业检索岗位画像" loading="lazy"></div>
+        </figure>
       </div>
     </section>
 
@@ -151,7 +160,7 @@
 <!-- ============================================================ APP -->
   <div class="view" id="view-app">
     <div class="app">
-      <aside class="side" aria-label="工作台步骤">
+      <aside class="side route-side" aria-label="工作台步骤">
         <div class="side-title">求职工作台</div>
         <a class="side-item" href="#/app/jobs" data-tab="jobs"><span class="si-ic" data-icon="briefcase"></span><span><b>找岗位</b><small id="st-jobs">第一步</small></span></a>
         <a class="side-item" href="#/app/diagnose" data-tab="diagnose"><span class="si-ic" data-icon="file"></span><span><b>差距诊断</b><small id="st-diagnose">选好岗位后</small></span></a>
@@ -163,9 +172,9 @@
 
       <section class="work">
         <!-- 岗位库 -->
-        <div class="pane" id="pane-jobs">
+        <div class="pane l-blue" id="pane-jobs">
           <header class="pane-head">
-            <div><nav class="crumb" aria-label="当前位置">工作台<i>/</i>找岗位</nav><h1 class="page-title">找目标岗位</h1><p class="page-desc">按专业或岗位名检索；海投时点卡片上的“海投”把多个岗位加入组合，程序会统计它们的共同要求。</p></div>
+            <div><nav class="crumb" aria-label="当前位置">工作台<i>/</i>找岗位</nav><h1 class="page-title"><span class="st-no">01</span>找目标岗位</h1><p class="page-desc">按专业或岗位名检索；海投时点卡片上的“海投”把多个岗位加入组合，程序会统计它们的共同要求。</p></div>
             <div class="pane-actions"><button class="btn btn-primary btn-sm" id="btnRecommend" type="button"><span data-icon="search"></span>按简历推荐岗位</button>
             <button class="btn btn-ghost btn-sm server-only" id="btnContribute" type="button"><span data-icon="upload"></span>贡献真实招聘</button></div>
           </header>
@@ -184,9 +193,9 @@
         </div>
 
         <!-- 诊断 -->
-        <div class="pane" id="pane-diagnose">
+        <div class="pane l-cyan" id="pane-diagnose">
           <header class="pane-head">
-            <div><nav class="crumb" aria-label="当前位置">工作台<i>/</i>差距诊断</nav><h1 class="page-title">差距诊断</h1><p class="page-desc">选定目标岗位（或粘贴一条招聘信息），再粘贴简历，逐条对照岗位要求。</p></div>
+            <div><nav class="crumb" aria-label="当前位置">工作台<i>/</i>差距诊断</nav><h1 class="page-title"><span class="st-no">02</span>差距诊断</h1><p class="page-desc">选定目标岗位（或粘贴一条招聘信息），再粘贴简历，逐条对照岗位要求。</p></div>
             <div class="pane-actions"><button class="btn btn-ghost btn-sm" type="button" data-action="history"><span data-icon="calendar"></span>诊断记录</button><button class="btn btn-ghost btn-sm" id="btnSample" type="button"><span data-icon="file"></span>载入示例</button></div>
           </header>
           <div class="key-hint hidden" id="keyHint"><span data-icon="info"></span><span>现在是<b>演示模式</b>（关键词规则，结果不代表真实效果）。填写你自己的大模型 API Key 后，就能获得真正的 AI 诊断和 30 天计划。</span><button type="button" class="btn btn-primary btn-sm" data-action="key">填写 API Key</button></div>
@@ -213,9 +222,9 @@
         </div>
 
         <!-- 计划 -->
-        <div class="pane" id="pane-plan">
-          <header class="pane-head"><div><nav class="crumb" aria-label="当前位置">工作台<i>/</i>30 天计划</nav><h1 class="page-title">30 天补差计划</h1><p class="page-desc">AI 设计学习内容，程序按你每天的可用时间排进日历：学习日、复盘日、综合项目和面试日。</p></div></header>
-          <div class="need" id="planNeed"><span data-icon="file"></span><p>请先完成一次差距诊断</p><a class="btn btn-primary btn-sm" href="#/app/diagnose">去诊断</a></div>
+        <div class="pane l-orange" id="pane-plan">
+          <header class="pane-head"><div><nav class="crumb" aria-label="当前位置">工作台<i>/</i>30 天计划</nav><h1 class="page-title"><span class="st-no">03</span>30 天补差计划</h1><p class="page-desc">AI 设计学习内容，程序按你每天的可用时间排进日历：学习日、复盘日、综合项目和面试日。</p></div></header>
+          <div class="need" id="planNeed"><img class="empty-img" src="img/empty-job.png" alt="" width="360" height="212"><p>请先完成一次差距诊断</p><a class="btn btn-primary btn-sm" href="#/app/diagnose">去诊断</a></div>
           <div class="hours hidden" id="planForm">
             <div class="hours-label"><span>每天能投入</span><b><span id="hoursVal">2</span> 小时</b></div>
             <input type="range" id="hours" min="1" max="4" step="0.5" value="2" aria-label="每天可投入小时数">
@@ -225,9 +234,9 @@
         </div>
 
         <!-- 面试 -->
-        <div class="pane" id="pane-interview">
-          <header class="pane-head"><div><nav class="crumb" aria-label="当前位置">工作台<i>/</i>模拟面试</nav><h1 class="page-title">模拟面试</h1><p class="page-desc">共 5 题，围绕你的短板提问；回答空泛会被追问。</p></div></header>
-          <div class="need" id="ivNeed"><span data-icon="file"></span><p>请先完成一次差距诊断</p><a class="btn btn-primary btn-sm" href="#/app/diagnose">去诊断</a></div>
+        <div class="pane l-purple" id="pane-interview">
+          <header class="pane-head"><div><nav class="crumb" aria-label="当前位置">工作台<i>/</i>模拟面试</nav><h1 class="page-title"><span class="st-no">04</span>模拟面试</h1><p class="page-desc">共 5 题，围绕你的短板提问；回答空泛会被追问。</p></div></header>
+          <div class="need" id="ivNeed"><img class="empty-img" src="img/empty-job.png" alt="" width="360" height="212"><p>请先完成一次差距诊断</p><a class="btn btn-primary btn-sm" href="#/app/diagnose">去诊断</a></div>
           <div id="ivArea" class="hidden">
             <div class="iv-top"><div class="iv-progress" id="ivProgress"></div><button class="btn btn-primary btn-sm" id="btnIvStart" type="button">开始面试</button></div>
             <div class="chat" id="ivChat" aria-live="polite"></div>
@@ -240,8 +249,8 @@
         </div>
 
         <!-- 问答 -->
-        <div class="pane" id="pane-ask">
-          <header class="pane-head"><div><nav class="crumb" aria-label="当前位置">工作台<i>/</i>就业问答</nav><h1 class="page-title">就业问答</h1><p class="page-desc">只依据资料库回答，每句话都标出处；资料库没有的内容会直接说明。</p></div></header>
+        <div class="pane l-green" id="pane-ask">
+          <header class="pane-head"><div><nav class="crumb" aria-label="当前位置">工作台<i>/</i>就业问答</nav><h1 class="page-title"><span class="st-no">05</span>就业问答</h1><p class="page-desc">只依据资料库回答，每句话都标出处；资料库没有的内容会直接说明。</p></div></header>
           <form class="search" id="askForm">
             <span data-icon="search"></span>
             <input id="question" placeholder="例如：大专毕业多久能申报人工智能工程技术人员初级？" maxlength="300" autocomplete="off">
