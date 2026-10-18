@@ -36,6 +36,8 @@ class PagesBuildTest(unittest.TestCase):
             deepseek = next(p for p in data["providers"] if p["id"] == "deepseek")
             self.assertEqual(deepseek["model"], "deepseek-chat")
             self.assertIn('<script src="browser-client.js">', html)
+            self.assertIn('<script src="browser-extract.js">', html)
+            self.assertTrue((out / "browser-extract.js").is_file())
             self.assertIn('href="stats.html"', html)
             image_names = {p.name for p in (out / "img").iterdir()}
             self.assertTrue({"hero-illustration.jpg", "train.png", "empty-job.png", "empty-search.png", "empty-done.png"} <= image_names)

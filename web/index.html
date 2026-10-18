@@ -203,7 +203,9 @@
             <div class="field">
               <div class="field-top"><label for="resume">我的简历</label><span class="count" id="cResume">0 字</span></div>
               <textarea id="resume" placeholder="教育经历、技能、项目经历、获奖……&#10;建议写清每段经历中你具体负责的部分。"></textarea>
-              <div class="field-bottom"><label class="file"><input type="file" id="resumeFile" accept=".txt,.md"><span data-icon="upload"></span>导入 .txt</label><span class="hint">手机号等隐私会被自动隐藏</span></div>
+              <div class="field-bottom imports"><label class="file"><input type="file" id="resumeFile" accept=".pdf,.docx,.pptx,.txt,.md"><span data-icon="upload"></span>导入简历（PDF / Word / TXT）</label><label class="file"><input type="file" id="worksFiles" multiple><span data-icon="plus"></span>添加作品文件</label><label class="file"><input type="file" id="worksDir" webkitdirectory multiple><span data-icon="layers"></span>添加作品文件夹</label></div>
+              <div class="works hidden" id="works"><div class="works-head"><b>项目作品材料</b><span class="muted small" id="worksSum"></span><button type="button" class="link-btn" id="worksClear">全部移除</button></div><ul class="works-list" id="worksList"></ul></div>
+              <p class="hint import-note">支持 PDF、Word（.docx）、PPT（.pptx）、代码、Notebook 等；只提取文字，图片/视频只记录文件名。文件不会保存，手机号等隐私会被自动隐藏。</p>
             </div>
             <div class="field target">
               <div class="field-top"><label>目标岗位</label><span class="seg" id="targetSeg"><button type="button" data-m="job" class="on">岗位库</button><button type="button" data-m="paste">粘贴招聘</button></span></div>
@@ -324,6 +326,7 @@
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script src="browser-client.js"></script>
+<script src="browser-extract.js"></script>
 <script src="browser-ui.js"></script>
 <script src="app.js"></script>
 </body>

@@ -242,3 +242,48 @@ test('successful resume optimization is included in local usage totals',async()=
   await client.request('/api/resume_tips',{resume,diagnosis:{requirements:[{item:'Python',status:'具备'}]}});
   assert.equal(new Records(storage).stats().events.resume_tips.count,1);
 });
+
+/* ---------- browser-side file extraction (GitHub Pages edition) */
+const zlib = require('node:zlib');
+const { extract } = require('../web/browser-extract.js');
+function zip(files) {   // minimal ZIP writer (deflate) for test fixtures
+  const locals = [], centrals = []; let offset = 0;
+  for (const [name, text] of Object.entries(files)) {
+    const n = Buffer.from(name), raw = Buffer.from(text), data = zlib.deflateRawSync(raw);
+    const local = Buffer.alloc(30); local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(data.length, 18); local.writeUInt32LE(raw.length, 22); local.writeUInt16LE(n.length, 26);
+    const central = Buffer.alloc(46); central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(8, 10);
+    central.writeUInt32LE(data.length, 20); central.writeUInt32LE(raw.length, 24); central.writeUInt16LE(n.length, 28); central.writeUInt32LE(offset, 42);
+    locals.push(local, n, data); centrals.push(central, n); offset += 30 + n.length + data.length;
+  }
+  const cd = Buffer.concat(centrals), end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(centrals.length / 2, 8); end.writeUInt16LE(centrals.length / 2, 10);
+  end.writeUInt32LE(cd.length, 12); end.writeUInt32LE(offset, 16);
+  return new Uint8Array(Buffer.concat([...locals, cd, end]));
+}
+function pdf(lines) {   // Type0 font + ToUnicode CMap + Flate content, like Word / Chrome exports
+  const chars = [...new Set(lines.join(''))], code = c => (chars.indexOf(c) + 1).toString(16).padStart(4, '0');
+  const cmap = `begincmap\n${chars.length} beginbfchar\n${chars.map(c => `<${code(c)}> <${c.charCodeAt(0).toString(16).padStart(4, '0')}>`).join('\n')}\nendbfchar\nendcmap`;
+  const ops = ['BT', '/F1 12 Tf', '72 720 Td', ...lines.flatMap((l, k) => [...(k ? ['0 -18 Td'] : []), `<${[...l].map(code).join('')}> Tj`]), 'ET'];
+  const content = zlib.deflateSync(Buffer.from(ops.join('\n')));
+  const objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    Buffer.concat([Buffer.from(`<< /Length ${content.length} /Filter /FlateDecode >>\nstream\n`, 'latin1'), content, Buffer.from('\nendstream')]),
+    '<< /Type /Font /Subtype /Type0 /Encoding /Identity-H /ToUnicode 6 0 R >>', `<< /Length ${cmap.length} >>\nstream\n${cmap}\nendstream`];
+  return new Uint8Array(Buffer.concat([Buffer.from('%PDF-1.4\n'), ...objs.flatMap((o, i) => [Buffer.from(`${i + 1} 0 obj\n`), Buffer.isBuffer(o) ? o : Buffer.from(o, 'latin1'), Buffer.from('\nendobj\n')]), Buffer.from('trailer\n<< /Root 1 0 R >>\n%%EOF')]));
+}
+test('extracts Word, PowerPoint and PDF text in the browser', async () => {
+  const w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  const docx = zip({ 'word/document.xml': `<w:document ${w}><w:body><w:p><w:r><w:t>熟悉 Python &amp; MySQL</w:t></w:r></w:p><w:p><w:r><w:t xml:space="preserve">用 LabelMe 标注</w:t></w:r></w:p></w:body></w:document>` });
+  assert.deepEqual(await extract('简历.docx', docx), { name: '简历.docx', kind: 'Word', text: '熟悉 Python & MySQL\n用 LabelMe 标注', media: false });
+  const pptx = zip({ 'ppt/slides/slide2.xml': '<p:sld><a:p><a:r><a:t>项目成果</a:t></a:r></a:p></p:sld>', 'ppt/slides/slide1.xml': '<p:sld><a:p><a:r><a:t>职途助手</a:t></a:r></a:p></p:sld>' });
+  assert.equal((await extract('答辩.pptx', pptx)).text, '[第1页] 职途助手\n[第2页] 项目成果');
+  assert.equal((await extract('报告.pdf', pdf(['职途助手项目', '用Python开发']))).text, '职途助手项目\n用Python开发');
+});
+test('extraction keeps media as names only and explains unsupported files', async () => {
+  assert.deepEqual(await extract('demo.mp4', new Uint8Array(4)), { name: 'demo.mp4', kind: '文件', text: '', media: true });
+  assert.equal((await extract('a.txt', new TextEncoder().encode('⻓沙⻔店 ⾦融'))).text, '长沙门店 金融');
+  for (const [name, bytes] of [['old.doc', new Uint8Array(1)], ['x.exe', new Uint8Array(2)], ['empty.txt', new TextEncoder().encode('  ')], ['bad.docx', new TextEncoder().encode('not a zip')]]) {
+    await assert.rejects(extract(name, bytes), { name: 'Error' }, name);
+  }
+});

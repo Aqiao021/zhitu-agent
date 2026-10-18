@@ -160,6 +160,36 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn("rewrites", t)
 
+    def test_extract_route(self):
+        import base64
+        from tests.test_extract import make_docx
+        b64 = lambda b: base64.b64encode(b).decode()
+        code, d = self.post("/api/extract", {"name": "简历.docx", "data": b64(make_docx(["电话 13812345678", "熟悉 Python 与 MySQL"]))})
+        self.assertEqual(code, 200)
+        self.assertIn("熟悉 Python 与 MySQL", d["text"])
+        self.assertNotIn("13812345678", d["text"])          # masked before it reaches the browser again
+        self.assertTrue(d["privacy"])
+        code, d = self.post("/api/extract", {"name": "a.doc", "data": b64(b"x")})
+        self.assertEqual(code, 400)
+        self.assertIn(".docx", d["error"])
+        code, d = self.post("/api/extract", {"name": "a.txt", "data": "%%%not base64"})
+        self.assertEqual(code, 400)
+        code, d = self.post("/api/extract", {"name": "a.mp4", "data": b64(b"0000")})
+        self.assertEqual((code, d["media"]), (200, True))
+
+    def test_extract_size_cap(self):
+        # announce an oversized upload without sending it: the server must refuse from the header alone
+        import http.client
+        conn = http.client.HTTPConnection("127.0.0.1", self.httpd.server_address[1], timeout=5)
+        try:
+            conn.putrequest("POST", "/api/extract")
+            conn.putheader("Content-Type", "application/json")
+            conn.putheader("Content-Length", str(server.MAX_UPLOAD + 1))
+            conn.endheaders()
+            self.assertEqual(conn.getresponse().status, 413)
+        finally:
+            conn.close()
+
     def test_rate_limit(self):
         old = server.CFG.rate_limit
         server.CFG.rate_limit = 2

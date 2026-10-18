@@ -928,3 +928,24 @@ html[data-mode="static"] .server-only, [hidden] { display: none !important; }
   html[data-mode="static"] .side-item { min-width: 0; }
   html[data-mode="static"] .brand-sub { display: none; }
 }
+
+/* ---------- file import: resume + project works */
+.field-bottom.imports { justify-content: flex-start; flex-wrap: wrap; gap: 8px 16px; }
+.file { padding: 4px 0; transition: opacity .2s; }
+.file:hover { text-decoration: underline; text-underline-offset: 3px; }
+.file.loading { opacity: .55; pointer-events: none; }
+.file.loading::after { content: "读取中…"; margin-left: 4px; color: var(--text-3); }
+.import-note { margin: 0; padding: 0 16px 12px; font-size: 12px; line-height: 1.6; }
+.works { margin: 0 16px 12px; border: 1px dashed var(--line); border-radius: var(--r-lg); padding: 8px 12px; background: var(--bg-2); }
+.works-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.works-head .link-btn { margin-left: auto; background: none; border: 0; color: var(--text-3); font-size: 12px; cursor: pointer; }
+.works-head .link-btn:hover { color: var(--miss); }
+.works-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; max-height: 148px; overflow: auto; }
+.works-list li { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; font-size: 12px; padding: 3px 4px 3px 8px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line-2); animation: itemIn .25s both; }
+.works-list li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.works-list em { font-style: normal; color: var(--primary); font-weight: 600; }
+.works-list small { color: var(--text-3); }
+.works-list button { display: inline-grid; place-items: center; width: 18px; height: 18px; border: 0; border-radius: 50%; background: transparent; color: var(--text-3); cursor: pointer; padding: 0; }
+.works-list button:hover { background: var(--line-2); color: inherit; }
+.works-list button svg { width: 12px; height: 12px; }
+@media (max-width: 767px) { .works-list li span { max-width: 160px; } }

@@ -2,6 +2,8 @@
 import json
 import mimetypes
 import secrets
+import base64
+import binascii
 import socket
 import sys
 import threading
@@ -17,6 +19,7 @@ from zhitu.demo import DemoLLM
 from zhitu.jobs import JobDB
 from zhitu.kb import KnowledgeBase
 from zhitu.llm import LLM, ModelError
+from zhitu.extract import ExtractError, extract
 from zhitu.privacy import mask
 from zhitu.store import Store
 from zhitu.userkey import public_providers, user_config
@@ -24,6 +27,7 @@ from zhitu.userkey import public_providers, user_config
 ROOT = Path(__file__).resolve().parent
 WEB = ROOT / "web"
 MAX_BODY = 200_000
+MAX_UPLOAD = 14_500_000  # base64 of a ~10 MB file
 
 CFG = config_mod.load()
 KB = KnowledgeBase(ROOT / "kb")
@@ -153,8 +157,9 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             length = 0
-        if length <= 0 or length > MAX_BODY:
-            return self._json(413, {"error": "内容为空或太长（上限约 20 万字节）"})
+        cap = MAX_UPLOAD if path == "/api/extract" else MAX_BODY
+        if length <= 0 or length > cap:
+            return self._json(413, {"error": "文件太大（单个文件上限约 10MB）" if path == "/api/extract" else "内容为空或太长（上限约 20 万字节）"})
         try:
             body = json.loads(self.rfile.read(length).decode("utf-8"))
             assert isinstance(body, dict)
@@ -184,6 +189,21 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": str(e)})
             STORE.event("recommend", True, 0, None, session, False)
             return self._json(200, result)
+        if path == "/api/extract":  # parse an uploaded file in memory; nothing is saved
+            if not allow(self._ip(), "extract", 200):
+                return self._json(429, {"error": "上传太频繁啦，请稍后再试"})
+            try:
+                data = base64.b64decode(str(body.get("data", "")), validate=True)
+            except (ValueError, binascii.Error):
+                return self._json(400, {"error": "文件内容不完整，请重新选择"})
+            try:
+                r = extract(str(body.get("name", "file"))[:120], data)
+            except ExtractError as e:
+                return self._json(400, {"error": str(e)})
+            except Exception:
+                return self._json(400, {"error": "这个文件读取失败，请换成 PDF / Word，或直接复制文字粘贴"})
+            masked, hidden = mask(r["text"])
+            return self._json(200, dict(r, text=masked, privacy=hidden))
         if path == "/api/key/test":
             if not ucfg:
                 return self._json(400, {"error": "请先填写 API Key"})

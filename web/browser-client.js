@@ -6,6 +6,7 @@
   const OLD_CATS = { '工具': '软件工具', '学历证书': '证书', '综合素质': '通用素养' };
   const WEIGHT = { '必需': 2, '加分': 1 };
   const KINDS = new Set(['diagnose', 'plan', 'interview', 'ask', 'resume_tips']);
+  const RESUME_MAX = 14000;   // resume plus extracted project materials
   const clip = (s, n = 6000) => String(s ?? '').trim().slice(0, n);
   const list = x => Array.isArray(x) ? x : [];
   const norm = s => String(s ?? '').replace(/\s/g, '');
@@ -359,7 +360,7 @@
       } finally { clearTimeout(timer); this.#controller = null; }
     }
     async diagnose({ resume, jd, job_id }) {
-      resume = clip(resume); jd = clip(jd);
+      resume = clip(resume, RESUME_MAX); jd = clip(jd);
       if (norm(resume).length < 30 || (!job_id && norm(jd).length < 20)) throw new Error('简历至少 30 字、招聘信息至少 20 字');
       const job = job_id ? this.get('/api/jobs/' + encodeURIComponent(job_id)) : null;
       const masked = mask(resume), refs = this.search(job ? job.title + ' ' + list(job.tools).slice(0, 5).join(' ') : mask(jd).text, 3);
@@ -409,7 +410,7 @@
       return schedule(data, daily, diagnosis, gaps);
     }
     recommend({resume}) {
-      resume=clip(resume); if(norm(resume).length<30) throw new Error('简历至少 30 字，才能推荐岗位');
+      resume=clip(resume, RESUME_MAX); if(norm(resume).length<30) throw new Error('简历至少 30 字，才能推荐岗位');
       const masked=mask(resume),low=masked.text.toLowerCase();
       const results=list(this.data.jobs?.jobs).map(j=>{
         let total=0,hit=0;const hits=[],missing=[];
@@ -423,7 +424,7 @@
       return {results,privacy:masked.counts,method:'按简历中出现的岗位关键词粗略匹配（必需项权重 2、加分项 1），只用于挑选候选岗位，准确对照请做差距诊断'};
     }
     async resume_tips({resume,diagnosis}) {
-      resume=clip(resume);if(norm(resume).length<30) throw new Error('请先在诊断页填写简历（至少 30 字）');
+      resume=clip(resume, RESUME_MAX);if(norm(resume).length<30) throw new Error('请先在诊断页填写简历（至少 30 字）');
       const reqs=list(diagnosis?.requirements).filter(r=>r && typeof r==='object').slice(0,15);
       if(!reqs.length) throw new Error('请先完成一次差距诊断');
       const masked=mask(resume).text;

@@ -14,6 +14,7 @@ STATUS = {"具备": 1.0, "部分具备": 0.5, "缺少": 0.0}
 WEIGHT = {"必需": 2, "加分": 1}
 OLD_CATS = {"工具": "软件工具", "学历证书": "证书", "综合素质": "通用素养"}
 MAX_TEXT = 6000
+RESUME_MAX = 14000  # resume plus extracted project materials
 REVIEW_DAYS = (7, 14, 21, 28)
 PROJECT_DAYS = (26, 27, 29)
 INTERVIEW_DAY = 30
@@ -43,7 +44,7 @@ class Agent:
 
     # ---------------------------------------------------------------- diagnose
     def diagnose(self, resume: str, jd: str = "", job_id: str = "") -> dict:
-        resume = _clip(resume)
+        resume = _clip(resume, RESUME_MAX)
         if len(_norm(resume)) < 30:
             raise ModelError("简历至少 30 字，才能做有意义的对照")
         resume_m, hidden = mask(resume)
@@ -272,7 +273,7 @@ class Agent:
 
     # ---------------------------------------------------------------- recommend & resume tips
     def recommend(self, resume: str) -> dict:
-        resume = _clip(resume)
+        resume = _clip(resume, RESUME_MAX)
         if len(_norm(resume)) < 30:
             raise ModelError("简历至少 30 字，才能推荐岗位")
         resume_m, hidden = mask(resume)
@@ -281,7 +282,7 @@ class Agent:
 
     def resume_tips(self, resume: str, diagnosis: dict) -> dict:
         """Rewrite resume lines so they show the evidence more clearly; never add facts that are not in the resume."""
-        resume = _clip(resume)
+        resume = _clip(resume, RESUME_MAX)
         if len(_norm(resume)) < 30:
             raise ModelError("请先在诊断页填写简历（至少 30 字）")
         resume_m, _ = mask(resume)

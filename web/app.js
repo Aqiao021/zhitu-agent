@@ -391,12 +391,13 @@ function recommendSheet() {
     <p class="eyebrow">岗位推荐 · 程序匹配</p>
     <h3 class="sheet-title">根据简历推荐岗位</h3>
     <p class="muted small">粘贴简历，程序会在 ${esc($("#jobCount").textContent)} 个岗位里找出你的简历已经覆盖最多要求的岗位。只做关键词匹配，不调用大模型，几秒出结果；手机号等会先被隐藏，简历不会保存。</p>
+    ${S.works.length ? `<p class="notice">${I("layers")}<span>会一并参考你在诊断页添加的 ${S.works.length} 个项目作品文件。</span></p>` : ""}
     <div class="field"><textarea id="rText" style="min-height:180px" placeholder="教育经历、技能、项目经历……">${esc($("#resume").value)}</textarea></div>
     <div class="sheet-actions"><button class="btn btn-primary" type="button" id="btnRec">开始推荐 ${I("arrow")}</button></div>
     <div id="recResult"></div>`);
   $("#btnRec").addEventListener("click", (e) => {
-    const resume = $("#rText").value.trim(); if (resume.length < 30) return toast("简历至少 30 字", true);
-    if (!$("#resume").value.trim()) { $("#resume").value = resume; count(); }   // reuse it on the diagnosis page
+    const text = $("#rText").value.trim(), resume = fullResume(text); if (resume.length < 30) return toast("简历至少 30 字", true);
+    if (!$("#resume").value.trim()) { $("#resume").value = text; count(); }   // reuse it on the diagnosis page
     busy(e.currentTarget, "匹配中", async () => {
       const r = await api("/api/recommend", { resume });
       $("#recResult").innerHTML = `
@@ -423,7 +424,7 @@ function recommendSheet() {
 
 /* ------------------------------------------------------------------ resume tips (rewrite real content only) */
 async function resumeTips(btn) {
-  const resume = $("#resume").value.trim();
+  const resume = fullResume();
   if (resume.length < 30) { toast("请在上方“我的简历”里保留简历内容，再生成建议", true); $("#resume").focus(); return; }
   const box = $("#tipsResult");
   box.innerHTML = skeleton("正在根据诊断结果改写简历表达", ["找出和岗位要求相关的原句", "模型改写表达方式", "程序核验原句与数字"], 6);
@@ -593,15 +594,88 @@ async function loadSample() {
 function count() { $("#cResume").textContent = $("#resume").value.trim().length + " 字"; $("#cJd").textContent = $("#jd").value.trim().length + " 字"; }
 $("#resume").addEventListener("input", count); $("#jd").addEventListener("input", count);
 $("#btnSample").addEventListener("click", loadSample);
-$("#resumeFile").addEventListener("change", (e) => {
-  const f = e.target.files[0]; if (!f) return;
-  if (f.size > 200000) return toast("文件太大，请直接粘贴文字", true);
-  const r = new FileReader(); r.onload = () => { $("#resume").value = r.result; count(); }; r.readAsText(f, "utf-8");
+/* ------------------------------------------------------------------ file import: resume + project works (text only, nothing stored) */
+const SKIP_DIR = /(^|\/)(node_modules|\.git|__pycache__|\.venv|venv|dist|build|\.idea|\.vscode|Library|Temp|obj|bin)\//;
+const OK_EXT = /\.(pdf|docx|pptx|ipynb|txt|md|py|js|ts|java|c|cpp|h|cs|go|kt|php|html|css|vue|json|sql|sh|yml|yaml|csv|xml|r|m|swift|png|jpe?g|gif|webp|bmp|svg|mp4|mov|avi|mkv|mp3|wav|psd|ai|fig|blend|fbx|obj|unity|prefab|zip|rar|7z|doc|ppt|wps)$/i;
+const MAX_FILE = 10 * 1024 * 1024, MAX_WORKS = 40;
+S.works = [];
+function readB64(f) {
+  return new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(",")[1] || ""); r.onerror = () => bad(new Error("读取文件失败")); r.readAsDataURL(f); });
+}
+async function extractFile(f, path) {
+  const name = path || f.name;
+  if (f.size > MAX_FILE) throw new Error(`${name}：超过 10MB`);
+  if (STATIC_MODE) {   // GitHub Pages: no server, so the file is parsed right here in the browser
+    const r = await ZhituExtract.extract(name.split("/").pop(), new Uint8Array(await f.arrayBuffer()));
+    const m = ZhituBrowser.mask(r.text);
+    return { ...r, text: m.text, privacy: m.counts, name };
+  }
+  const r = await fetch("/api/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.split("/").pop(), data: await readB64(f) }) })
+    .catch(() => { throw new Error("连接不上服务器，请确认服务已启动"); });
+  const d = await r.json().catch(() => ({ error: "服务器返回格式不正确" }));
+  if (!r.ok) throw new Error(d.error || `读取失败（${r.status}）`);
+  return { ...d, name };
+}
+$("#resumeFile").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const label = e.target.parentElement; label.classList.add("loading");
+  try {
+    const d = await extractFile(f);
+    if (!d.text) throw new Error("这个文件里没有可读取的文字");
+    $("#resume").value = d.text; count();
+    toast(`已读取 ${d.kind} 简历 ${d.text.length} 字${privacyNote(d.privacy)}，请检查一遍有没有错字或乱序`);
+  } catch (err) { toast(err.message, true); } finally { label.classList.remove("loading"); }
 });
+function privacyNote(p) { const n = Object.values(p || {}).reduce((a, b) => a + b, 0); return n ? `（已隐藏 ${n} 处个人信息）` : ""; }
+async function addWorks(input) {
+  const all = [...input.files]; input.value = "";
+  const files = all.filter((f) => { const p = f.webkitRelativePath || f.name; return OK_EXT.test(p) && !SKIP_DIR.test(p) && !/(^|\/)\./.test(p.split("/").pop()); });
+  const room = MAX_WORKS - S.works.length;
+  if (!files.length) return toast(all.length ? "文件夹里没有可读取的文档或代码" : "没有选择文件", true);
+  if (room <= 0) return toast(`最多添加 ${MAX_WORKS} 个文件`, true);
+  // documents first, then code, then media; largest folders get trimmed, not refused
+  const rank = (f) => /\.(pdf|docx|pptx|md|txt|ipynb)$/i.test(f.name) ? 0 : /\.(png|jpe?g|gif|webp|bmp|svg|mp4|mov|avi|mkv|mp3|wav|psd|ai|fig|blend|fbx|obj|unity|prefab|zip|rar|7z)$/i.test(f.name) ? 2 : 1;
+  const take = files.sort((a, b) => rank(a) - rank(b)).slice(0, room);
+  const label = input.parentElement; label.classList.add("loading");
+  let bad = [];
+  for (const f of take) {
+    const path = f.webkitRelativePath || f.name;
+    if (S.works.some((w) => w.name === path)) continue;
+    try { S.works.push(await extractFile(f, path)); renderWorks(); } catch (err) { bad.push(err.message); }
+  }
+  label.classList.remove("loading");
+  const skipped = files.length - take.length;
+  toast(bad.length ? `${bad.length} 个文件没读到：${bad[0]}` : `已添加 ${take.length} 个文件${skipped ? `，另有 ${skipped} 个超出上限未添加` : ""}`, bad.length > 0);
+}
+$("#worksFiles").addEventListener("change", (e) => addWorks(e.target));
+$("#worksDir").addEventListener("change", (e) => addWorks(e.target));
+$("#worksClear").addEventListener("click", () => { S.works = []; renderWorks(); });
+function renderWorks() {
+  const box = $("#works"); box.classList.toggle("hidden", !S.works.length);
+  const chars = S.works.reduce((a, w) => a + w.text.length, 0);
+  $("#worksSum").textContent = `${S.works.length} 个文件 · 读到 ${chars} 字`;
+  $("#worksList").innerHTML = S.works.map((w, k) => `<li title="${esc(w.name)}"><em>${esc(w.media ? "仅文件名" : w.kind)}</em><span>${esc(w.name)}</span>${w.media ? "" : `<small class="num">${w.text.length}</small>`}<button type="button" aria-label="移除" data-wdel="${k}">${icon("x")}</button></li>`).join("");
+  $$("[data-wdel]").forEach((b) => b.addEventListener("click", () => { S.works.splice(+b.dataset.wdel, 1); renderWorks(); }));
+}
+/* resume + excerpts of the works, so the model can cite them as evidence */
+function worksBlock() {
+  if (!S.works.length) return "";
+  const docs = S.works.filter((w) => !w.media), media = S.works.filter((w) => w.media);
+  let left = 8000, out = [];
+  for (const w of docs) {
+    if (left < 200) break;
+    let t = w.kind === "代码" ? w.text.split("\n").slice(0, 40).join("\n") : w.text;
+    t = t.slice(0, Math.min(1500, left));
+    out.push(`《${w.name}》（${w.kind}）\n${t}`); left -= t.length + w.name.length + 10;
+  }
+  if (media.length) out.push(`其他作品文件（只有文件名）：${media.map((w) => w.name).slice(0, 30).join("、")}`);
+  return "\n\n【项目作品材料（从上传文件自动提取，节选）】\n" + out.join("\n\n");
+}
+const fullResume = (r = $("#resume").value.trim()) => (r + worksBlock()).trim();
 
 $("#btnDiagnose").addEventListener("click", (e) => {
-  const resume = $("#resume").value.trim(), jd = $("#jd").value.trim();
-  if (resume.length < 30) return toast("简历内容至少 30 字", true);
+  const resume = fullResume(), jd = $("#jd").value.trim();
+  if (resume.length < 30) return toast("简历内容至少 30 字（也可以导入简历或添加项目作品）", true);
   if (S.mode === "job" && !S.job) return toast("请先从岗位库选择目标岗位，或切换到“粘贴招聘”", true);
   if (S.mode === "paste" && jd.length < 20) return toast("招聘信息至少 20 字", true);
   const body = S.mode === "job" ? { resume, job_id: S.job.id } : { resume, jd };
