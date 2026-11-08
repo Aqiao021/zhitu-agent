@@ -56,12 +56,13 @@
           <p class="lead">选定目标岗位，逐条对照岗位要求与个人简历，明确已具备、部分具备和缺少的能力；再按每天可投入的时间，生成 30 天补差计划，并针对短板进行模拟面试。</p>
           <div class="hero-actions">
             <a class="btn btn-primary btn-lg" href="#/app/jobs">进入工作台</a>
-            <a class="btn btn-ghost-dark btn-lg" href="#/app/diagnose?sample=1">查看示例诊断</a>
+            <a class="btn btn-ghost-dark btn-lg server-only" href="#/app/diagnose?sample=1">查看示例诊断</a>
+            <button type="button" class="btn btn-ghost-dark btn-lg static-only" data-action="demo">一键示例体验 · 无需 Key</button>
           </div>
           <dl class="hero-facts">
             <div><dt>覆盖专业</dt><dd><b class="num" id="majorCount">19</b> 个</dd></div>
             <div><dt>岗位画像</dt><dd><b class="num" id="jobCount">45</b> 个</dd></div>
-            <div><dt>公开资料</dt><dd><b class="num" id="docCount">8</b> 份</dd></div>
+            <div><dt>公开资料</dt><dd><b class="num" id="docCount">15</b> 份</dd></div>
           </dl>
         </div>
         <div class="hero-map" id="heroMap" aria-hidden="true"></div>
@@ -172,6 +173,11 @@
       </aside>
 
       <section class="work">
+        <div class="demo-bar" id="demoBar" role="status" hidden>
+          <span class="demo-ic" data-icon="sparkle"></span>
+          <div class="demo-copy"><b>示例体验</b><span>虚构人物“小林”的简历；模型输出是预先写好的示例，依据核验、匹配度和 30 天排期由程序现场计算。不调用模型，也不会存进你的记录。</span></div>
+          <div class="demo-actions"><button type="button" class="btn btn-default btn-sm" data-action="demo-day30"><span data-icon="refresh"></span>看 30 天后复诊</button><button type="button" class="btn btn-primary btn-sm" data-action="key">连接自己的模型</button><button type="button" class="btn btn-ghost btn-sm" data-action="demo-exit">退出示例</button></div>
+        </div>
         <!-- 岗位库 -->
         <div class="pane l-blue" id="pane-jobs">
           <header class="pane-head">
@@ -232,6 +238,7 @@
             <div class="hours-label"><span>每天能投入</span><b><span id="hoursVal">2</span> 小时</b></div>
             <input type="range" id="hours" min="1" max="4" step="0.5" value="2" aria-label="每天可投入小时数">
             <button class="btn btn-primary" id="btnPlan" type="button">生成计划 <span data-icon="arrow"></span></button>
+            <p class="plan-weak" id="planWeak" hidden></p>
           </div>
           <div id="planResult" aria-live="polite"></div>
         </div>
@@ -316,7 +323,7 @@
     </div>
     <div><h4>功能</h4><ul><li><a href="#/app/jobs">岗位库</a></li><li><a href="#/app/diagnose">差距诊断</a></li><li><a href="#/app/plan">30 天计划</a></li><li><a href="#/app/interview">模拟面试</a></li><li><a href="#/app/ask">就业问答</a></li></ul></div>
     <div><h4>说明</h4><ul><li><a href="#/about">原理与隐私</a></li><li><a href="#/app/ask">资料库与出处</a></li><li><button type="button" class="linkish foot-link" data-action="key">使用自己的 API Key</button></li></ul></div>
-    <div><h4>关于</h4><ul><li>作者：张佳群</li><li>漳州职业技术学院 人工智能学院</li><li>版本 2.0 · 数据更新于 2026 年 10 月</li></ul></div>
+    <div><h4>关于</h4><ul><li>作者：张佳群</li><li>漳州职业技术学院 人工智能学院</li><li>版本 2.1 · 数据更新于 2026 年 11 月</li></ul></div>
   </div>
   <div class="container foot-bottom">© 2026 职途助手 · 学生作品，非商业用途</div>
 </footer>

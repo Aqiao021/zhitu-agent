@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { Client, Records, mask, extractJSON } = require('../web/browser-client.js');
+const { Client, Records, mask, extractJSON, locateEvidence, planGaps } = require('../web/browser-client.js');
 
 const data = {
   prompts: Object.fromEntries(['DIAGNOSE', 'DIAGNOSE_JOB', 'PLAN30', 'INTERVIEW_Q', 'INTERVIEW_END', 'ASK', 'RESUME_TIPS'].map(k => [k, k])),
@@ -286,4 +286,102 @@ test('extraction keeps media as names only and explains unsupported files', asyn
   for (const [name, bytes] of [['old.doc', new Uint8Array(1)], ['x.exe', new Uint8Array(2)], ['empty.txt', new TextEncoder().encode('  ')], ['bad.docx', new TextEncoder().encode('not a zip')]]) {
     await assert.rejects(extract(name, bytes), { name: 'Error' }, name);
   }
+});
+
+test('evidence matching tolerates copy slips but still rejects fabrication (same rules as Python)', async () => {
+  const R = '项目：2024年参与学院“智慧校园”项目，使用Python和Pandas清洗了3000条问卷数据，并用Matplotlib绘制图表。熟悉 MySQL 基本查询。';
+  assert.equal(locateEvidence('使用 Python 和 Pandas，清洗了3000条问卷数据。', R).text, '使用Python和Pandas清洗了3000条问卷数据');
+  const slip = locateEvidence('使用Python与Pandas清洗3000条问卷数据', R);
+  assert.equal(slip.exact, false); assert.equal(slip.text, '使用Python和Pandas清洗了3000条问卷数据');
+  assert.ok(locateEvidence('熟悉ＭｙＳＱＬ基本查询', R));
+  for (const fake of ['熟练使用TensorFlow训练图像分类模型', '精通 MySQL', '使用python和pandas清洗了三千条问卷数据', '']) assert.equal(locateEvidence(fake, R), null);
+  const { client } = setup({ job_title: 'x', requirements: [{ item: 'Python', status: '具备', evidence: '会使用Python写简单的脚本' }] });
+  const d = await client.request('/api/diagnose', { resume, jd });
+  assert.equal(d.requirements[0].evidence, '会使用 Python 写简单脚本');
+  assert.equal(d.requirements[0].status, '具备');
+  assert.equal(d.corrected_evidence, 1);
+});
+
+function sseResponse(events) {
+  const enc = new TextEncoder(), lines = events.map(e => `data: ${typeof e === 'string' ? e : JSON.stringify(e)}\n\n`);
+  const bytes = enc.encode(lines[0]), cut = Math.floor(bytes.length / 2) + 1;   // first event split mid-line (and possibly mid-character)
+  const parts = [bytes.slice(0, cut), bytes.slice(cut), ...lines.slice(1).map(l => enc.encode(l))];
+  let i = 0;
+  return { ok: true, headers: { get: () => 'text/event-stream; charset=utf-8' }, body: { getReader: () => ({ read: async () => i < parts.length ? { done: false, value: parts[i++] } : { done: true } }) } };
+}
+test('streams OpenAI-compatible output, reports progress and still verifies the final JSON', async () => {
+  const reply = JSON.stringify(diagnosisReply), pieces = [reply.slice(0, 40), reply.slice(40, 90), reply.slice(90)];
+  const calls = [], seen = [];
+  const client = new Client({ data, storage: memoryStorage(), fetch: async (url, options) => { calls.push(JSON.parse(options.body)); return sseResponse([...pieces.map(p => ({ choices: [{ delta: { content: p } }] })), '[DONE]']); } });
+  client.configure({ key: 'synthetic-test-credential', baseURL: 'https://api.deepseek.com/v1', model: 'deepseek-chat' });
+  const result = await client.request('/api/diagnose', { resume, jd }, { onProgress: p => seen.push(p.chars) });
+  assert.equal(calls[0].stream, true);
+  assert.equal(result.match_score, 67);
+  assert.ok(seen.length >= 2 && seen.at(-1) === reply.length && seen.every((n, i) => !i || n >= seen[i - 1]));
+});
+test('streams Anthropic deltas; without a progress listener no stream is requested', async () => {
+  const calls = [];
+  const client = new Client({ data, storage: memoryStorage(), fetch: async (url, options) => {
+    const body = JSON.parse(options.body); calls.push(body);
+    if (!body.stream) return { ok: true, json: async () => ({ content: [{ type: 'text', text: '{"answer":1}' }] }) };
+    return sseResponse([{ type: 'message_start' }, { type: 'content_block_delta', delta: { type: 'text_delta', text: '资料' } }, { type: 'content_block_delta', delta: { type: 'text_delta', text: '里写到 [1]' } }, { type: 'message_stop' }]);
+  } });
+  client.configure({ key: 'synthetic-test-credential', baseURL: 'https://api.anthropic.com/v1', model: 'claude', provider: 'anthropic' });
+  const r = await client.request('/api/ask', { question: '大专毕业怎么申报初级' }, { onProgress: () => {} });
+  assert.equal(r.answer, '资料里写到 [1]');
+  await client.request('/api/test');
+  assert.equal(calls[0].stream, true); assert.equal(calls[1].stream, undefined);
+});
+test('a provider that rejects streaming (HTTP 400) is retried once without it; stream errors surface', async () => {
+  const calls = [];
+  const client = new Client({ data, storage: memoryStorage(), fetch: async (url, options) => {
+    const body = JSON.parse(options.body); calls.push(body);
+    return body.stream ? { ok: false, status: 400 } : { ok: true, json: async () => ({ choices: [{ message: { content: '答案 [1]' } }] }) };
+  } });
+  client.configure({ key: 'synthetic-test-credential', baseURL: 'https://api.deepseek.com/v1', model: 'deepseek-chat' });
+  assert.equal((await client.request('/api/ask', { question: '申报条件' }, { onProgress: () => {} })).answer, '答案 [1]');
+  assert.deepEqual(calls.map(c => !!c.stream), [true, false]);
+  const bad = new Client({ data, storage: memoryStorage(), fetch: async () => sseResponse([{ error: { message: 'quota exceeded' } }]) });
+  bad.configure({ key: 'synthetic-test-credential', baseURL: 'https://api.deepseek.com/v1', model: 'deepseek-chat' });
+  await assert.rejects(bad.request('/api/ask', { question: '申报条件' }, { onProgress: () => {} }), /quota exceeded/);
+});
+test('sample walkthrough runs every step offline, through the same checks, without recording usage', async () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const demo = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'web', 'demo.json'), 'utf8'));
+  const jobs = { majors: [], jobs: [{ id: demo.job_id, title: demo.job_title, summary: 's', majors: [], tools: ['Python'], certificates: [], sources: [], kind: '画像',
+    requirements: ['熟练用Python编程，会用NumPy、Pandas、Matplotlib处理和可视化数据', '能用OpenCV完成图像和视频处理', '能用TensorFlow或PyTorch训练并测试图像分类、目标检测等模型', '能用Flask、Django或FastAPI把模型封装成Web接口', '完成过至少1个AI综合项目（从数据处理、训练到部署）', '会在Linux下配置Python和深度学习环境（含显卡驱动），写简单Shell脚本', '会调用AI云平台的视觉、语音或NLP接口（如百度AI开放平台）', '了解大模型应用：提示工程、RAG、Milvus或Chroma向量数据库', '会用jieba做中文分词等NLP处理', '会用Docker打包部署应用']
+      .map((item, i) => ({ item, category: '专业技能', level: i < 6 ? '必需' : '加分', keywords: [] })) }] };
+  let fetched = 0; const storage = memoryStorage();
+  const client = new Client({ data: { ...data, jobs }, storage, demoDelay: 0, fetch: async () => { fetched++; throw new Error('no network'); } });
+  client.startDemo(demo);
+  assert.equal(client.status, 'demo');
+  const progress = [];
+  const d = await client.request('/api/diagnose', { resume: demo.resume, job_id: demo.job_id }, { onProgress: p => progress.push(p.chars) });
+  assert.equal(d.demo, true); assert.equal(d.match_score, 22); assert.equal(d.unverified_evidence, 1); assert.equal(d.corrected_evidence, 1);
+  assert.ok(progress.length > 5);
+  const d30 = await client.request('/api/diagnose', { resume: demo.resume_day30, job_id: demo.job_id });
+  assert.equal(d30.match_score, 53);
+  await assert.rejects(client.request('/api/diagnose', { resume: resume + '，另外做过很多项目经历和比赛', job_id: demo.job_id }), /示例简历/);
+  const q2 = await client.request('/api/interview', { diagnosis: d, history: [{ q: 'q', a: 'a' }], rounds: 5 });
+  assert.equal(q2.question, demo.interview[1].question);
+  const end = await client.request('/api/interview', { diagnosis: d, history: Array(5).fill({ q: 'q', a: 'a' }), rounds: 5 });
+  assert.equal(end.weak_items.length, 3);
+  const plan = await client.request('/api/plan', { diagnosis: d, daily_hours: 2 });
+  assert.equal(plan.days.length, 30);
+  const tips = await client.request('/api/resume_tips', { resume: demo.resume, diagnosis: d });
+  assert.ok(tips.rewrites[0].rewrite.includes('（填写真实数字）'));
+  const ask = await client.request('/api/ask', { question: '申报条件' });
+  assert.ok(ask.answer.startsWith('示例体验不调用模型') && ask.grounded);
+  assert.equal(fetched, 0);
+  assert.equal(client.records.read().length, 0);
+  client.disconnect();
+  assert.equal(client.status, 'disconnected');
+  await assert.rejects(client.request('/api/plan', { diagnosis: d }), /API Key/);
+});
+test('plan gaps include interview-exposed items first among equals and keep their reason', () => {
+  const gaps = planGaps({ requirements: [
+    { item: 'A', level: '必需', status: '部分具备' }, { item: 'B', level: '必需', status: '具备', interview_weak: true, interview_note: '讲不清' },
+    { item: 'C', level: '必需', status: '具备' }, { item: 'D', level: '必需', status: '缺少' }] });
+  assert.deepEqual(gaps.map(g => g.item), ['D', 'B', 'A']);
+  assert.equal(gaps[1].status, '部分具备'); assert.equal(gaps[1].interview_note, '讲不清');
 });

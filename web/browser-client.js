@@ -29,6 +29,67 @@
     }
     return { text, counts };
   }
+  /* Evidence matching tolerant of copy slips; keep in sync with zhitu/evidence.py */
+  const SIMILARITY = 0.85, MIN_FUZZY = 8;
+  function canon(text) {
+    const out = [], idx = [], chars = [...String(text ?? '')];
+    let offset = 0;
+    for (const ch of chars) {
+      for (const c of ch.normalize('NFKC').toLowerCase()) if (/[\p{L}\p{N}]/u.test(c)) { out.push(c); idx.push(offset); }
+      offset += ch.length;
+    }
+    return { s: out, idx };
+  }
+  function sellers(p, t) {
+    let prev = new Array(t.length + 1).fill(0), start = [...Array(t.length + 1).keys()];
+    for (let i = 1; i <= p.length; i++) {
+      const cur = [i], curStart = [0];
+      for (let j = 1; j <= t.length; j++) {
+        let best = prev[j - 1] + (p[i - 1] !== t[j - 1] ? 1 : 0), s = start[j - 1];
+        if (prev[j] + 1 < best) { best = prev[j] + 1; s = start[j]; }
+        if (cur[j - 1] + 1 < best) { best = cur[j - 1] + 1; s = curStart[j - 1]; }
+        cur[j] = best; curStart[j] = s;
+      }
+      prev = cur; start = curStart;
+    }
+    let end = 0;
+    for (let j = 1; j <= t.length; j++) if (prev[j] < prev[end]) end = j;
+    return { dist: prev[end], s: start[end], e: end };
+  }
+  function locateEvidence(evidence, resume) {
+    resume = String(resume ?? '');
+    const ev = canon(evidence).s;
+    if (!ev.length) return null;
+    const { s: res, idx } = canon(resume), evs = ev.join(''), ress = res.join('');
+    const span = (a, b) => resume.slice(idx[a], idx[b - 1] + [...resume.slice(idx[b - 1])][0].length);
+    const at = ress.indexOf(evs);
+    if (at >= 0) { const pos = [...ress.slice(0, at)].length; return { text: span(pos, pos + ev.length), exact: true, similarity: 1 }; }
+    const m = ev.length;
+    if (m < MIN_FUZZY || !res.length) return null;
+    const grams = new Set();
+    for (let i = 0; i + 3 <= m; i++) grams.add(ev.slice(i, i + 3).join(''));
+    const windows = [];
+    for (let j = 0; j + 3 <= res.length; j++) {
+      if (!grams.has(res.slice(j, j + 3).join(''))) continue;
+      if (windows.length && j - windows[windows.length - 1][1] <= m) windows[windows.length - 1][1] = j; else windows.push([j, j]);
+    }
+    let best = null;
+    for (const [lo, hi] of windows.sort((a, b) => (a[0] - a[1]) - (b[0] - b[1])).slice(0, 6)) {
+      const a0 = Math.max(0, lo - m), b0 = Math.min(res.length, hi + m + 3);
+      const r = sellers(ev, res.slice(a0, b0)), sim = 1 - r.dist / m;
+      if (r.e > r.s && (!best || sim > best.sim)) best = { sim, s: a0 + r.s, e: a0 + r.e };
+    }
+    if (!best || best.sim < SIMILARITY) return null;
+    return { text: span(best.s, best.e), exact: false, similarity: Math.round(best.sim * 1000) / 1000 };
+  }
+  /* Items to work on, most urgent first; interview-exposed weak items join even when the resume shows them (same as plan_gaps in agent.py) */
+  function planGaps(diagnosis) {
+    const rank = { '必需缺少': 0, '必需部分具备': 1, '加分缺少': 2, '加分部分具备': 3 };
+    return list(diagnosis?.requirements).filter(r => r && typeof r === 'object' && (r.status !== '具备' || r.interview_weak))
+      .map(({ item, category, level = '必需', status, advice, count, interview_weak, interview_note }) => ({ item, category, level, status: status === '具备' ? '部分具备' : status, advice, count,
+        ...(interview_weak ? { interview_weak: true, interview_note: clip(interview_note, 60) } : {}) }))
+      .sort((a, b) => (rank[a.level + a.status] ?? 4) - (rank[b.level + b.status] ?? 4) || (!!b.interview_weak - !!a.interview_weak) || (b.count || 0) - (a.count || 0));
+  }
   function extractJSON(input) {
     const text = String(input ?? '').trim();
     const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -229,8 +290,9 @@
     #settings = null;
     #generation = 0;
     #controller = null;
-    constructor({ data, fetch: fetcher = root.fetch.bind(root), storage = root.localStorage, onStatus = () => {}, onStorageError = () => {} }) {
+    constructor({ data, fetch: fetcher = root.fetch.bind(root), storage = root.localStorage, onStatus = () => {}, onStorageError = () => {}, demoDelay = 90 }) {
       this.data = data;
+      this.demoDelay = demoDelay;
       this.fetch = fetcher;
       this.records = new Records(storage);
       this.onStatus = onStatus;
@@ -257,6 +319,7 @@
       this.#generation++;
       this.#controller?.abort();
       this.#settings = null;
+      this.demo = null;
       this.setStatus('disconnected');
     }
     get(path) {
@@ -302,37 +365,103 @@
         return { ...item, id, score };
       }).filter(c => c.score > 0).sort((a, b) => b.score - a.score || a.id - b.id).slice(0, k).map(c => c.chunk);
     }
-    async chat(system, user, maxTokens = 2000, temperature = 0.3) {
+    /* Sample walkthrough without a key: replies come from a pre-recorded script (web/demo.json) and still
+       pass through the same verification and scheduling code. Nothing is sent anywhere. */
+    startDemo(script) {
+      if (!script?.diagnose) throw new Error('示例数据加载失败，请刷新重试');
+      this.disconnect();
+      this.demo = script;
+      this.#settings = { demo: true };
+      this.setStatus('demo');
+    }
+    get demoActive() { return !!this.#settings?.demo; }
+    #progress = null;
+    #emit(text) { try { this.#progress?.({ text, chars: text.length }); } catch (_) { /* UI errors never break a request */ } }
+    async #demoChat(system, user) {
+      const P = this.data.prompts, d = this.demo, wait = ms => new Promise((ok, no) => {
+        const t = setTimeout(ok, ms), signal = this.#controller?.signal;
+        signal?.addEventListener('abort', () => { clearTimeout(t); no(new Error('请求已取消')); }, { once: true });
+      });
+      let reply;
+      if (system === P.DIAGNOSE_JOB) {
+        if (!user.includes(d.job_title) || !(user.includes(d.resume_marker) || user.includes(d.day30_marker))) throw new Error('示例体验只能用示例简历诊断示例岗位；想诊断自己的简历，请连接自己的模型');
+        reply = user.includes(d.day30_marker) ? d.diagnose_day30 : d.diagnose;
+      } else if (system === P.DIAGNOSE) throw new Error('示例体验请使用“从岗位库选择”；想诊断粘贴的招聘信息，请连接自己的模型');
+      else if (system === P.PLAN30) reply = d.plan;
+      else if (system === P.RESUME_TIPS) reply = d.resume_tips;
+      else if (system === P.INTERVIEW_Q) reply = list(d.interview)[Math.max(0, Number((user.match(/请出第 (\d+) 题/) || [])[1] || 1) - 1)] || list(d.interview).at(-1);
+      else if (system === P.INTERVIEW_END) reply = d.interview_end;
+      else throw new Error('示例体验不支持这个功能');
+      const text = typeof reply === 'string' ? reply : JSON.stringify(reply);
+      const steps = system === P.PLAN30 ? 36 : system === P.DIAGNOSE_JOB ? 28 : 10, size = Math.ceil(text.length / steps);
+      for (let i = size; i < text.length + size; i += size) { await wait(this.demoDelay); this.#emit(text.slice(0, i)); }
+      return text;
+    }
+    async chat(system, user, maxTokens = 2000, temperature = 0.3, stream = true) {
       const settings = this.#settings;
       if (!settings) throw new Error('请先连接模型，填写你自己的 API Key');
+      if (settings.demo) return this.#demoChat(system, user);
       const anthropic = settings.provider === 'anthropic';
+      stream = stream && !!this.#progress;
       const response = await this.fetch(settings.baseURL + (anthropic ? '/messages' : '/chat/completions'), {
         method: 'POST', redirect: 'error', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer',
         headers: { 'Content-Type': 'application/json', ...(anthropic ? { 'x-api-key': settings.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' } : { Authorization: `Bearer ${settings.key}` }) },
-        body: JSON.stringify({ model: settings.model, max_tokens: maxTokens, temperature, ...(anthropic ? { system, messages: [{ role: 'user', content: user }] } : { messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }) }),
+        body: JSON.stringify({ model: settings.model, max_tokens: maxTokens, temperature, ...(stream ? { stream: true } : {}), ...(anthropic ? { system, messages: [{ role: 'user', content: user }] } : { messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }) }),
         signal: this.#controller.signal,
       });
       if (this.#controller.signal.aborted) throw new Error('请求已取消');
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) this.setStatus('configured');
+        if (stream && response.status === 400) return this.chat(system, user, maxTokens, temperature, false);   // provider without streaming
         const reason = { 401: '密钥无效，请检查后重新填写', 402: '模型账户余额不足，请前往服务商控制台检查', 403: '没有调用权限，请检查密钥与模型', 429: '模型接口限流，请稍后再试' }[response.status] || '请检查模型名称、接口地址，或稍后重试';
         throw new Error(`模型接口 HTTP ${response.status}：${reason}`);
       }
-      const body = await response.json();
-      const text = anthropic ? list(body?.content).filter(b => b.type === 'text').map(b => b.text).join('') : body?.choices?.[0]?.message?.content;
+      const type = String(response.headers?.get?.('content-type') || '');
+      let text;
+      if (stream && response.body?.getReader && type.includes('event-stream')) text = await this.#readStream(response.body.getReader(), anthropic);
+      else {
+        const body = await response.json();
+        text = anthropic ? list(body?.content).filter(b => b.type === 'text').map(b => b.text).join('') : body?.choices?.[0]?.message?.content;
+      }
       if (typeof text !== 'string' || !text.trim()) throw new Error('模型没有返回有效内容，请检查模型是否支持聊天接口');
       if (this.#controller.signal.aborted) throw new Error('请求已取消');
       this.setStatus('connected');
       return text;
     }
+    /* Server-sent events from OpenAI-compatible (choices[].delta.content) or Anthropic (content_block_delta) APIs */
+    async #readStream(reader, anthropic) {
+      const decoder = new TextDecoder();
+      let buffer = '', text = '', done = false;
+      while (!done) {
+        const chunk = await reader.read();
+        if (chunk.done) { buffer += decoder.decode(); done = true; } else buffer += decoder.decode(chunk.value, { stream: true });
+        const lines = buffer.split(/\r?\n/);
+        buffer = done ? '' : lines.pop();
+        let grew = false;
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          const payload = line.slice(5).trim();
+          if (!payload || payload === '[DONE]') continue;
+          let event;
+          try { event = JSON.parse(payload); } catch (_) { continue; }
+          if (event.error || event.type === 'error') throw new Error('模型接口返回错误：' + clip(event.error?.message || event.error || '未知错误', 120));
+          const piece = anthropic ? (event.type === 'content_block_delta' ? event.delta?.text : '') : event.choices?.[0]?.delta?.content;
+          if (typeof piece === 'string' && piece) { text += piece; grew = true; }
+        }
+        if (grew) this.#emit(text);
+      }
+      return text;
+    }
     record(row) {
+      if (this.demoActive) return;   // sample walkthroughs are not usage
       try { this.records.add(row); } catch (_) { this.onStorageError('本机记录保存失败（可能是存储空间不足或浏览器禁止存储），请及时导出已有记录'); }
     }
-    async request(path, body = {}) {
+    async request(path, body = {}, { onProgress } = {}) {
       const kind = path.split('/').pop();
       if (kind === 'recommend') return this.recommend(body);
       if (kind === 'feedback') {
         if (!KINDS.has(body.kind) || !Number.isInteger(body.rating) || body.rating < 1 || body.rating > 5) throw new Error('请先选择 1～5 星评分');
+        if (this.demoActive) return { ok: true, demo: true };
         let comment = mask(clip(body.comment, 200)).text;
         if (this.#settings) comment = comment.split(this.#settings.key).join('[已隐藏密钥]');
         this.records.add({ type: 'feedback', kind: body.kind, rating: body.rating, useful: typeof body.useful === 'boolean' ? body.useful : null, comment });
@@ -341,23 +470,27 @@
       if (!KINDS.has(kind) && !['test', 'resume_tips'].includes(kind)) throw new Error('不支持的功能');
       if (!this.#settings) throw new Error('请先连接模型，填写你自己的 API Key');
       if (this.#controller) throw new Error('正在处理上一个请求，请等待完成后再试');
-      const generation = this.#generation, start = Date.now();
+      const generation = this.#generation, start = Date.now(), demo = this.demoActive;
       this.#controller = new AbortController();
       const timeout = kind === 'plan' ? 120000 : 60000;
-      const timer = setTimeout(() => this.#controller?.abort(), timeout);
+      let timer;
+      const arm = () => { clearTimeout(timer); timer = setTimeout(() => this.#controller?.abort(), timeout); };   // idle timeout: streaming output keeps it alive
+      arm();
+      this.#progress = onProgress ? (p => { arm(); onProgress(p); }) : null;
       try {
-        const result = kind === 'test' ? (await this.chat('这是连接测试，请只回复 OK。', 'OK', 8), { ok: true }) : await this[kind](body);
+        if (kind === 'test' && demo) throw new Error('示例体验不需要测试连接');
+        const result = kind === 'test' ? (await this.chat('这是连接测试，请只回复 OK。', 'OK', 8, 0.3, false), { ok: true }) : await this[kind](body);
         if (generation !== this.#generation) throw new Error('请求已取消');
         const elapsed = Date.now() - start;
         if (KINDS.has(kind) || kind === 'resume_tips') this.record({ type: 'event', kind, ok: true, ms: elapsed, score: result.match_score ?? null });
-        return { ...result, elapsed_ms: elapsed, demo: false };
+        return { ...result, elapsed_ms: elapsed, demo };
       } catch (error) {
         if ((KINDS.has(kind) || kind === 'resume_tips') && generation === this.#generation) this.record({ type: 'event', kind, ok: false, ms: Date.now() - start, score: null });
         if (generation !== this.#generation) throw new Error('请求已取消');
-        if (this.#controller.signal.aborted) throw new Error(`等待超过 ${timeout / 1000} 秒，请稍后重试；服务商可能已处理本次请求`);
+        if (this.#controller.signal.aborted) throw new Error(`超过 ${timeout / 1000} 秒没有收到模型输出，请稍后重试；服务商可能已处理本次请求`);
         if (error instanceof TypeError) throw new Error('无法连接模型接口，请检查网络、接口地址及服务商是否允许浏览器跨域访问');
         throw error;
-      } finally { clearTimeout(timer); this.#controller = null; }
+      } finally { clearTimeout(timer); this.#controller = null; this.#progress = null; }
     }
     async diagnose({ resume, jd, job_id }) {
       resume = clip(resume, RESUME_MAX); jd = clip(jd);
@@ -380,11 +513,12 @@
         });
         data.job_title = job.title;
       }
-      let flagged = 0;
+      let flagged = 0, corrected = 0;
       const requirements = list(data.requirements).slice(0, 15).filter(r => r && clip(r.item)).map(r => {
         let status = Object.hasOwn(STATUS, r.status) ? r.status : '缺少';
         let evidence = clip(r.evidence), note = '';
-        const verified = !!evidence && norm(masked.text).includes(norm(evidence));
+        const found = evidence ? locateEvidence(evidence, masked.text) : null, verified = !!found;
+        if (found && !found.exact) { corrected++; evidence = found.text; note = '模型摘录与简历原文有细微差异，已替换为简历原文'; }
         if (evidence && !verified) { flagged++; evidence = ''; note = '模型给出的依据在简历中找不到原文，已降级处理'; }
         if (!evidence && status === '具备') { status = '部分具备'; note ||= '简历中没有找到明确依据'; }
         const category = OLD_CATS[r.category] || r.category;
@@ -395,15 +529,13 @@
       const score = Math.round(100 * requirements.reduce((s, r) => s + STATUS[r.status] * WEIGHT[r.level], 0) / requirements.reduce((s, r) => s + WEIGHT[r.level], 0));
       return { job_title: clip(data.job_title || '目标岗位', 40), summary: clip(data.summary, 300), requirements: requirements.sort((a, b) => STATUS[a.status] - STATUS[b.status] || WEIGHT[b.level] - WEIGHT[a.level]), counts, match_score: score,
         must_gaps: requirements.filter(r => r.level === '必需' && r.status === '缺少').length,
-        strengths: strings(data.strengths, 3, 80), honesty_notes: strings(data.honesty_notes, 5, 120), standard_note: clip(data.standard_note, 200), references: refs, privacy: masked.counts, unverified_evidence: flagged,
+        strengths: strings(data.strengths, 3, 80), honesty_notes: strings(data.honesty_notes, 5, 120), standard_note: clip(data.standard_note, 200), references: refs, privacy: masked.counts, unverified_evidence: flagged, corrected_evidence: corrected,
         source: job ? { type: 'job', id: job.id, kind: job.kind, sources: list(job.sources).slice(0, 3), ...(job.combo ? {combo:job.combo} : {}) } : { type: 'paste' },
         ...(job ? { job: { id: job.id, title: job.title, tools: job.tools, certificates: job.certificates } } : {}) };
     }
     async plan({ diagnosis, daily_hours }) {
       const daily = clamp(Math.round(number(daily_hours, 2) * 2) / 2, 1, 4) * 60;
-      const rank = { '必需缺少': 0, '必需部分具备': 1, '加分缺少': 2, '加分部分具备': 3 };
-      const gaps = list(diagnosis?.requirements).filter(r => r.status !== '具备').map(({ item, category, level = '必需', status, advice, count }) => ({ item, category, level, status, advice, count }))
-        .sort((a, b) => (rank[a.level + a.status] ?? 4) - (rank[b.level + b.status] ?? 4) || (b.count || 0) - (a.count || 0));
+      const gaps = planGaps(diagnosis);
       if (!gaps.length) throw new Error('请先完成一次包含待补差距的诊断');
       const brief = JSON.stringify({ job_title: diagnosis.job_title, job_tools: list(diagnosis.job?.tools).slice(0, 12), gaps: gaps.slice(0, 10) });
       const data = extractJSON(await this.chat(this.data.prompts.PLAN30, `每天可用时间：${daily} 分钟\n学习日共 22 天，学习日总时长约 ${daily * 22} 分钟\n差距诊断：${brief}`, 4000));
@@ -433,8 +565,9 @@
       const numbers=new Set(masked.match(/\d+(?:\.\d+)?/g)||[]),rewrites=[];let dropped=0;
       for(const t of list(data.rewrites).slice(0,8)) {
         if(!t || typeof t!=='object')continue;
-        const original=clip(t.original),rewrite=clip(t.rewrite);
-        if(!original || !rewrite || !norm(masked).includes(norm(original))){dropped++;continue;}
+        const rewrite=clip(t.rewrite),found=clip(t.original)&&rewrite?locateEvidence(clip(t.original),masked):null;
+        if(!found){dropped++;continue;}
+        const original=found.text;
         let blanks=false;
         const checked=rewrite.replace(/\d+(?:\.\d+)?/g,n=>{if(numbers.has(n))return n;blanks=true;return '（填写真实数字）';});
         rewrites.push({original:original.slice(0,200),rewrite:checked.slice(0,260),requirement:clip(t.requirement,80),why:clip(t.why,100),blanks});
@@ -453,7 +586,10 @@
         const data = extractJSON(await this.chat(this.data.prompts.INTERVIEW_END, `岗位与诊断：${context}\n\n问答记录：\n${log}`, 2000));
         const keys = ['专业知识', '项目表达', '问题解决', '沟通表达', '岗位匹配'];
         const scores = Object.fromEntries(keys.map(k => [k, clamp(Math.round(number(data.scores?.[k], 3)), 1, 5)]));
-        return { done: true, scores, total: Math.round(Object.values(scores).reduce((s, n) => s + n, 0) * 4), reasons: Object.fromEntries(keys.map(k => [k, clip(data.reasons?.[k], 120)])), advice: strings(data.advice, 3, 100), better_answer: { question: clip(data.better_answer?.question, 200), answer: clip(data.better_answer?.answer, 600) } };
+        const items = new Map(list(diagnosis.requirements).filter(r => r && typeof r === 'object').map(r => [String(r.item ?? ''), r])), seen = new Set();
+        const weak_items = list(data.weak_items).map(w => ({ item: clip(w?.item), reason: clip(w?.reason, 60) }))
+          .filter(w => items.has(w.item) && !seen.has(w.item) && seen.add(w.item)).slice(0, 3).map(w => ({ ...w, status: items.get(w.item).status }));
+        return { done: true, weak_items, scores, total: Math.round(Object.values(scores).reduce((s, n) => s + n, 0) * 4), reasons: Object.fromEntries(keys.map(k => [k, clip(data.reasons?.[k], 120)])), advice: strings(data.advice, 3, 100), better_answer: { question: clip(data.better_answer?.question, 200), answer: clip(data.better_answer?.answer, 600) } };
       }
       const data = extractJSON(await this.chat(this.data.prompts.INTERVIEW_Q, `岗位与诊断：${context}\n\n已进行的问答：\n${log || '（尚未开始）'}\n\n请出第 ${history.length + 1} 题（共 ${rounds} 题）。`, 600, 0.6));
       if (!clip(data.question)) throw new Error('没有生成面试问题，请重试');
@@ -464,13 +600,15 @@
       if (norm(question).length < 2) throw new Error('请输入问题');
       const refs = this.search(question, 5);
       if (!refs.length) return { answer: '资料库里没有找到相关信息。建议向学院就业指导老师或辅导员咨询。', references: [], grounded: false };
-      let answer = await this.chat(this.data.prompts.ASK, `参考资料：\n${refsText(refs)}\n\n问题：${question}`, 800);
+      let answer = this.demoActive
+        ? `示例体验不调用模型，下面直接列出资料库中最相关的原文，连接模型后会生成归纳回答。\n${refs.slice(0, 3).map((r, i) => `· 《${r.title}》${r.section}：${clip(r.text, 90)}${r.text.length > 90 ? '…' : ''} [${i + 1}]`).join('\n')}`
+        : await this.chat(this.data.prompts.ASK, `参考资料：\n${refsText(refs)}\n\n问题：${question}`, 800);
       const cited = new Set();
       answer = answer.replace(/\[(\d+)\]/g, (full, n) => { n = +n; if (n >= 1 && n <= refs.length) { cited.add(n); return full; } return ''; });
       return { answer: answer.trim(), references: [...cited].sort((a, b) => a - b).map(n => ({ ...refs[n - 1], n })), grounded: cited.size > 0 };
     }
   }
-  const api = { Client, Records, mask, extractJSON };
+  const api = { Client, Records, mask, extractJSON, locateEvidence, planGaps };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ZhituBrowser = api;
 })(globalThis);

@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT))
 from zhitu import prompts  # noqa: E402
 from zhitu.agent import Agent  # noqa: E402
 from zhitu.demo import DemoLLM  # noqa: E402
+from zhitu.evidence import locate  # noqa: E402
 from zhitu.jobs import JobDB, normalize  # noqa: E402
 from zhitu.kb import KnowledgeBase, tokens  # noqa: E402
 from zhitu.llm import ModelError, extract_json  # noqa: E402
@@ -110,6 +111,90 @@ def modules(n_tasks=6, minutes=60, n_mod=3):
 GAPS = {"job_title": "x", "requirements": [{"item": "Linux", "status": "缺少", "level": "必需", "category": "专业技能"},
                                           {"item": "证书", "status": "缺少", "level": "加分", "category": "证书"}],
         "job": {"tools": ["Linux"], "certificates": ["某证书"]}}
+
+
+class EvidenceTest(unittest.TestCase):
+    R = "项目：2024年参与学院“智慧校园”项目，使用Python和Pandas清洗了3000条问卷数据，并用Matplotlib绘制图表。熟悉 MySQL 基本查询。"
+
+    def test_punctuation_and_width_tolerated(self):
+        f = locate("使用 Python 和 Pandas，清洗了3000条问卷数据。", self.R)
+        self.assertTrue(f["exact"])
+        self.assertEqual(f["text"], "使用Python和Pandas清洗了3000条问卷数据")
+        self.assertTrue(locate("熟悉ＭｙＳＱＬ基本查询", self.R))   # full-width letters
+
+    def test_small_copy_slip_replaced_by_resume_text(self):
+        f = locate("使用Python与Pandas清洗3000条问卷数据", self.R)
+        self.assertFalse(f["exact"])
+        self.assertGreaterEqual(f["similarity"], 0.85)
+        self.assertEqual(f["text"], "使用Python和Pandas清洗了3000条问卷数据")
+
+    def test_fabrication_still_rejected(self):
+        self.assertIsNone(locate("熟练使用TensorFlow训练图像分类模型", self.R))
+        self.assertIsNone(locate("精通 MySQL", self.R))            # short quotes must match exactly
+        self.assertIsNone(locate("使用python和pandas清洗了三千条问卷数据", self.R))
+        self.assertIsNone(locate("", self.R))
+
+    def test_diagnosis_counts_corrections(self):
+        llm = ScriptedLLM({"requirements": [
+            {"item": "熟悉 Python", "status": "具备", "evidence": "会使用Python写简单的脚本"},
+            {"item": "Git", "status": "具备", "evidence": "了解 Git 基本操作。"}]})
+        d = Agent(llm, KB).diagnose(RESUME, JD)
+        by = {r["item"]: r for r in d["requirements"]}
+        self.assertEqual(by["熟悉 Python"]["evidence"], "会使用 Python 写简单脚本")
+        self.assertEqual(by["熟悉 Python"]["status"], "具备")
+        self.assertEqual(d["corrected_evidence"], 1)
+        self.assertEqual(d["unverified_evidence"], 0)
+
+
+class DemoScriptTest(unittest.TestCase):
+    """The pre-recorded sample walkthrough (web/demo.json) must pass the same program checks as real output."""
+    D = json.loads((ROOT / "web" / "demo.json").read_text(encoding="utf-8"))
+
+    def run_dx(self, reply, resume):
+        return Agent(ScriptedLLM(reply), KB, JOBS).diagnose(resume, job_id=self.D["job_id"])
+
+    def test_first_diagnosis_shows_correction_and_interception(self):
+        d = self.run_dx(self.D["diagnose"], self.D["resume"])
+        self.assertEqual(d["job_title"], self.D["job_title"])
+        self.assertEqual(d["unverified_evidence"], 1)       # the invented RAG claim is caught
+        self.assertEqual(d["corrected_evidence"], 1)        # the slightly mis-copied quote is fixed
+        self.assertEqual(d["match_score"], 22)
+
+    def test_day30_rediagnosis_improves(self):
+        d = self.run_dx(self.D["diagnose_day30"], self.D["resume_day30"])
+        self.assertEqual(d["unverified_evidence"], 0)
+        self.assertEqual(d["corrected_evidence"], 0)
+        self.assertEqual(d["match_score"], 53)
+
+    def test_plan_interview_and_tips(self):
+        d = self.run_dx(self.D["diagnose"], self.D["resume"])
+        iv = Agent(ScriptedLLM(self.D["interview_end"]), KB, JOBS).interview(d, [{"q": "q", "a": "a"}] * 5, 5)
+        self.assertEqual([w["item"] for w in iv["weak_items"]][:1], ["能用Flask、Django或FastAPI把模型封装成Web接口"])
+        self.assertEqual(len(iv["weak_items"]), 3)          # the item that is not a requirement is dropped
+        for w in iv["weak_items"]:
+            r = next(r for r in d["requirements"] if r["item"] == w["item"])
+            r["interview_weak"], r["interview_note"] = True, w["reason"]
+        p = Agent(ScriptedLLM(self.D["plan"]), KB, JOBS).plan(d, 2)
+        self.assertEqual(len(p["days"]), 30)
+        self.assertTrue(all(day["minutes"] <= 120 for day in p["days"]))
+        t = Agent(ScriptedLLM(self.D["resume_tips"]), KB, JOBS).resume_tips(self.D["resume"], d)
+        self.assertEqual(t["dropped"], 0)
+        self.assertIn("（填写真实数字）", t["rewrites"][0]["rewrite"])   # "50 名同学" was never in the resume
+
+
+class PlanGapsTest(unittest.TestCase):
+    def test_interview_weak_items_join_and_lead(self):
+        from zhitu.agent import plan_gaps
+        d = {"requirements": [
+            {"item": "A", "level": "必需", "status": "部分具备"},
+            {"item": "B", "level": "必需", "status": "具备", "interview_weak": True, "interview_note": "讲不清"},
+            {"item": "C", "level": "必需", "status": "具备"},
+            {"item": "D", "level": "必需", "status": "缺少"}]}
+        self.assertEqual([g["item"] for g in plan_gaps(d)], ["D", "B", "A"])
+        self.assertEqual(plan_gaps(d)[1]["status"], "部分具备")
+        llm = ScriptedLLM({"modules": [{"skill": "x", "tasks": [{"title": "t", "minutes": 30}]}]})
+        Agent(llm, KB).plan(d, 1)
+        self.assertIn("interview_weak", json.dumps(llm.sent, ensure_ascii=False))
 
 
 class PlanTest(unittest.TestCase):

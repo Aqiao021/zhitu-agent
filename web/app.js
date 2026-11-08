@@ -52,7 +52,7 @@ const I = (n) => `<span data-icon="${n}">${icon(n)}</span>`;
 /* ------------------------------------------------------------------ utils */
 const store = {
   get(k, d) { try { const v = localStorage.getItem("zt_" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-  set(k, v) { try { localStorage.setItem("zt_" + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+  set(k, v) { if (typeof S !== "undefined" && S.demo) return; try { localStorage.setItem("zt_" + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },   // the sample walkthrough never touches saved data
 };
 /* visitor's own model key: sessionStorage by default, localStorage only if they tick "remember" */
 const KEY = {
@@ -68,14 +68,14 @@ function toast(msg, err = false) {
   const t = $("#toast"); t.textContent = msg; t.classList.toggle("err", err); t.classList.add("show");
   clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 4200);
 }
-async function api(path, body, llm) {
+async function api(path, body, llm, onProgress) {
   if (STATIC_MODE) {
     await browserReady;
     if (!browserClient) throw new Error('页面资料加载失败，请刷新重试');
     if (!['/api/feedback', '/api/recommend'].includes(path) && browserClient.status === 'disconnected') {
       keySheet(); throw new Error('请先连接模型，填写你自己的 API Key');
     }
-    return browserClient.request(path, body);
+    return browserClient.request(path, body, { onProgress });
   }
   const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 170000);
   const k = llm || userKey();
@@ -95,14 +95,37 @@ function skeleton(msg, stages = [], every = 6) {
   const id = "ld" + Math.random().toString(36).slice(2, 8), t0 = Date.now();
   const tick = () => {
     const box = document.getElementById(id); if (!box) return clearInterval(timer);
-    const sec = Math.floor((Date.now() - t0) / 1000), cur = Math.min(stages.length - 1, Math.floor(sec / every));
+    const sec = Math.floor((Date.now() - t0) / 1000), cur = box.dataset.stage ? +box.dataset.stage : Math.min(stages.length - 1, Math.floor(sec / every));
     $(".sk-time", box).textContent = `已等待 ${sec} 秒`;
     $$(".ld-step", box).forEach((el, k) => { el.classList.toggle("done", k < cur); el.classList.toggle("cur", k === cur); });
   };
   const timer = setInterval(tick, 1000); queueMicrotask(tick);
   return `<div class="skeleton" id="${id}"><div class="sk-msg"><span class="spin"></span><span>${esc(msg)}</span><span class="sk-time"></span></div>
     ${stages.length ? `<ol class="ld-steps">${stages.map((x) => `<li class="ld-step"><i></i>${esc(x)}</li>`).join("")}</ol>` : ""}
+    <div class="sk-live" hidden></div>
     <div class="sk" style="width:70%"></div><div class="sk"></div><div class="sk" style="width:85%"></div></div>`;
+}
+/* streaming output: count what the model has produced so far and show it in the waiting card */
+function live(sel, describe, stage) {
+  let last = null, queued = false;
+  return (p) => {
+    last = p; if (queued) return; queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      const box = $(sel + " .skeleton"); if (!box) return;
+      const out = describe(last.text || "");
+      if (stage != null) box.dataset.stage = stage;
+      box.classList.add("streaming");
+      const el = $(".sk-live", box); el.hidden = false;
+      if (out && typeof out === "object") { el.classList.add("sk-text"); el.textContent = out.text; }
+      else el.innerHTML = `${I("sparkle")}<span>${esc(out || `模型已输出 ${last.chars} 字`)}</span>`;
+    });
+  };
+}
+const countKey = (t, k) => (t.match(new RegExp(`"${k}"\\s*:`, "g")) || []).length;
+function partialString(t, k) {   // the value of "k": "..." in unfinished JSON, unescaped as far as it goes
+  const m = t.match(new RegExp(`"${k}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)`)); if (!m) return "";
+  try { return JSON.parse(`"${m[1].replace(/\\$/, "")}"`); } catch (e) { return m[1]; }
 }
 /* motion helpers: staggered entrance + number count-up (skipped when the user prefers reduced motion) */
 const calm = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -152,7 +175,7 @@ function route() {
   }
   window.scrollTo({ top: 0 });
 }
-window.addEventListener("hashchange", () => { document.documentElement.classList.add("nav"); route(); });
+window.addEventListener("hashchange", () => { document.documentElement.classList.add("route-animated"); route(); });
 window.addEventListener("scroll", () => $("#nav").classList.toggle("scrolled", window.scrollY > 8), { passive: true });
 
 /* reveal on scroll — content stays visible if the observer never fires */
@@ -431,7 +454,7 @@ async function resumeTips(btn) {
   const box = $("#tipsResult");
   box.innerHTML = skeleton("正在根据诊断结果改写简历表达", ["找出和岗位要求相关的原句", "模型改写表达方式", "程序核验原句与数字"], 6);
   await busy(btn, "生成中", async () => {
-    const t = await api("/api/resume_tips", { resume, diagnosis: S.diagnosis });
+    const t = await api("/api/resume_tips", { resume, diagnosis: S.diagnosis }, null, live("#tipsResult", (x) => `模型已改写 ${countKey(x, "rewrite")} 句`, 1));
     S.tips = { hid: S.hid, data: t }; renderTips(t, true);
   });
   if ($(".skeleton", box)) box.innerHTML = "";
@@ -495,14 +518,22 @@ $$("#targetSeg button").forEach((b) => b.addEventListener("click", () => setMode
 /* ------------------------------------------------------------------ diagnosis history (this browser only) */
 const RANK = { "缺少": 0, "部分具备": 1, "具备": 2 };
 const histKey = (d) => (d.source?.type === "job" ? "job:" + d.source.id : "t:" + d.job_title);
-const getHist = () => store.get("dx_history", []);
-function saveHistory(d) {
-  const h = getHist(), id = Date.now().toString(36);
-  h.unshift({ id, ts: Date.now(), key: histKey(d), title: d.job_title, score: d.match_score, d });
+const getHist = () => S.demo ? S.demoHist : store.get("dx_history", []);
+function putHist(h) {
+  if (S.demo) { S.demoHist = h.slice(0, 20); return; }
   for (let n = Math.min(h.length, 20); n > 0; n--) {   // shrink if the browser storage is full
     try { localStorage.setItem("zt_dx_history", JSON.stringify(h.slice(0, n))); break; } catch (e) { /* try fewer */ }
   }
+}
+function saveHistory(d, ts = Date.now()) {
+  const h = getHist(), id = ts.toString(36) + Math.random().toString(36).slice(2, 5);
+  h.unshift({ id, ts, key: histKey(d), title: d.job_title, score: d.match_score, d });
+  putHist(h);
   return id;
+}
+function updateHistory(hid, fn) {   // keep a history entry in step with the diagnosis (interview flags, interview scores)
+  const h = getHist(), x = h.find((y) => y.id === hid); if (!x) return;
+  fn(x); putHist(h);
 }
 const fmtDate = (ts) => { const t = new Date(ts); return `${t.getMonth() + 1}月${t.getDate()}日 ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`; };
 function previousOf(hid) {   // the most recent earlier diagnosis for the same job
@@ -548,6 +579,7 @@ function compareCard(d) {
       <div><h4 class="c-miss">仍然缺少 ${still.length} 条</h4>${still.length ? `<ul>${still.map((r) => `<li><span>${esc(r.item)}</span></li>`).join("")}</ul>` : `<p class="muted small">没有了，很棒</p>`}</div>
       ${down.length ? `<div><h4 class="c-part">有所下降 ${down.length} 条</h4><ul>${down.map(li).join("")}</ul><p class="muted small">可能是简历这次没写到，检查一下是否遗漏。</p></div>` : ""}
     </div>
+    ${(() => { const iv = ivRecords(histKey(d)); return iv.length >= 2 ? `<p class="cmp-iv">${I("mic")}模拟面试：${iv.map((x) => x.total).join(" → ")} 分</p>` : ""; })()}
     ${prev.d.source?.type === "job" ? "" : `<p class="muted small">提示：粘贴招聘信息时，两次拆出的要求可能不完全相同，只对比了文字一致的条目。</p>`}
   </div>`;
 }
@@ -565,7 +597,7 @@ function historySheet() {
     S.hid = x.id; S.diagnosis = x.d; S.filter = "全部"; store.set("hid", x.id); store.set("diagnosis", x.d);
     closeSheet(); location.hash = "#/app/diagnose"; renderDiagnosis(); syncSteps(); toast(`正在查看 ${fmtDate(x.ts)} 的诊断`);
   }));
-  const c = $("#btnClearHist"); if (c) c.addEventListener("click", () => { store.set("dx_history", []); if (S.diagnosis) S.hid = saveHistory(S.diagnosis); store.set("hid", S.hid); closeSheet(); renderDiagnosis(); toast("已清除历史记录，只保留当前这次"); });
+  const c = $("#btnClearHist"); if (c) c.addEventListener("click", () => { putHist([]); if (S.diagnosis) S.hid = saveHistory(S.diagnosis); store.set("hid", S.hid); closeSheet(); renderDiagnosis(); toast("已清除历史记录，只保留当前这次"); });
 }
 
 /* ------------------------------------------------------------------ diagnose */
@@ -683,8 +715,10 @@ $("#btnDiagnose").addEventListener("click", (e) => {
   const body = S.mode === "job" ? { resume, job_id: S.job.id } : { resume, jd };
   $("#diagResult").innerHTML = skeleton("正在逐条对照岗位要求，通常需要 10～40 秒", ["隐藏手机号等个人信息", "读取岗位要求与参考资料", "模型逐条判断简历", "程序核验依据并计算匹配度"], 5);
   $("#diagResult").scrollIntoView({ behavior: "smooth", block: "start" });
+  const total = S.mode === "job" ? S.job.total || 0 : 0;
+  const onProgress = live("#diagResult", (t) => { const k = countKey(t, "status"); return k ? `模型正在逐条判断：已完成 ${total ? Math.min(k, total) + " / " + total : k} 条` : "模型已开始输出…"; }, 2);
   busy(e.currentTarget, "诊断中", async () => {
-    const d = await api("/api/diagnose", body);
+    const d = await api("/api/diagnose", body, null, onProgress);
     S.diagnosis = d; S.filter = "全部"; S.selDay = null;
     S.hid = saveHistory(d); store.set("hid", S.hid);   // the previous 30-day plan and its progress are kept
     store.set("diagnosis", d);
@@ -708,7 +742,7 @@ function renderDiagnosis() {
   <div class="card report">
     <div class="report-top">
       <div class="report-main">
-        <p class="eyebrow">诊断报告${d.demo ? " · 演示模式" : ""}</p>
+        <p class="eyebrow">诊断报告${d.demo ? (STATIC_MODE ? " · 示例体验" : " · 演示模式") : ""}</p>
         <h2 class="report-title">${esc(d.job_title)}</h2>
         <p class="muted">${esc(d.summary)}</p>
         ${src}
@@ -724,7 +758,7 @@ function renderDiagnosis() {
     </div>
     <div class="stack" aria-hidden="true"><i style="width:${c["具备"] / n * 100}%;background:var(--have)"></i><i style="width:${c["部分具备"] / n * 100}%;background:var(--part)"></i><i style="width:${c["缺少"] / n * 100}%;background:var(--miss)"></i></div>
     <div class="route-card"><div class="route-head"><b>${I("layers")}职途地图</b><small>${c["具备"]} / ${n} 站已点亮</small></div>${routeMap(d)}</div>
-    <p class="method">${I("info")}匹配度按具备 1 分、部分具备 0.5 分、缺少 0 分计算，必需项权重 2、加分项权重 1，由程序计算${hidden ? `；已自动隐藏 ${esc(hidden)}` : ""}${d.unverified_evidence ? `；${d.unverified_evidence} 条模型依据在简历中找不到原文，已降级` : ""}</p>
+    <p class="method">${I("info")}匹配度按具备 1 分、部分具备 0.5 分、缺少 0 分计算，必需项权重 2、加分项权重 1，由程序计算${hidden ? `；已自动隐藏 ${esc(hidden)}` : ""}${d.unverified_evidence ? `；${d.unverified_evidence} 条模型依据在简历中找不到原文，已降级` : ""}${d.corrected_evidence ? `；${d.corrected_evidence} 条依据与原文仅有标点或个别字差异，已替换为简历原文` : ""}</p>
   </div>
   ${compareCard(d)}
   <div class="report-grid">
@@ -736,12 +770,13 @@ function renderDiagnosis() {
         ${list.map((r) => { const [cls, pill] = ST[r.status]; return `
         <div class="rt-row ${cls}" role="row">
           <span role="cell"><span class="st ${pill}">${esc(r.status)}</span></span>
-          <span role="cell" class="rt-item">${esc(r.item)}${r.count && so.combo ? `<span class="share">${r.count}/${so.combo.n} 个岗位</span>` : ""}</span>
+          <span role="cell" class="rt-item">${esc(r.item)}${r.count && so.combo ? `<span class="share">${r.count}/${so.combo.n} 个岗位</span>` : ""}${r.interview_weak ? `<span class="iv-flag">面试暴露</span>` : ""}</span>
           <span role="cell" class="rt-cat">${esc(r.category)}</span>
           <span role="cell">${lv(r)}</span>
           <span role="cell" class="rt-ev">
             ${r.evidence ? `<span class="quote-box"><small>${I("check")}简历原文 · 已核验</small>${esc(r.evidence)}</span>` : ""}
             ${r.note ? `<span class="note">${I("alert")}${esc(r.note)}</span>` : ""}
+            ${r.interview_weak ? `<span class="note iv">${I("mic")}模拟面试：${esc(r.interview_note || "回答中暴露不足")}，已列为计划重点</span>` : ""}
             ${r.advice ? `<span class="advice">${I("bulb")}<span>${esc(r.advice)}</span></span>` : ""}
           </span>
         </div>`; }).join("") || `<p class="muted pad">这一类没有条目</p>`}
@@ -779,7 +814,8 @@ $("#hours").addEventListener("input", (e) => { $("#hoursVal").textContent = e.ta
 $("#btnPlan").addEventListener("click", (e) => {
   $("#planResult").innerHTML = skeleton("正在生成 30 天计划，通常需要 1～2 分钟", ["整理需要补的差距项", "模型设计学习模块和每日任务", "程序排进 30 天日历并检查时长"], 15);
   busy(e.currentTarget, "规划中", async () => {
-    const p = await api("/api/plan", { diagnosis: S.diagnosis, daily_hours: +$("#hours").value });
+    const p = await api("/api/plan", { diagnosis: S.diagnosis, daily_hours: +$("#hours").value }, null,
+      live("#planResult", (t) => `模型已设计 ${countKey(t, "skill")} 个学习模块、${countKey(t, "minutes")} 个小任务`, 1));
     p.hid = S.hid; S.plan = p; S.done = {}; S.selDay = null; store.set("plan", p); store.set("done", {}); renderPlan(true); syncSteps();
   }).then(() => { if ($("#planResult .skeleton")) { if (S.plan) renderPlan(); else $("#planResult").innerHTML = ""; } });
 });
@@ -804,11 +840,14 @@ function renderPlan(animate = false) {
   const sel = p.days.find((d) => d.day === S.selDay) || p.days[0];
   const doneDays = p.days.filter(dayDone).length;
   const based = p.hid && p.hid !== S.hid ? getHist().find((x) => x.id === p.hid) : null;
+  const weakItems = new Set((S.diagnosis?.requirements || []).filter((r) => r.interview_weak).map((r) => r.item));
+  const recheck = !based && p.hid === S.hid && doneDays >= 7 && doneDays < 30;
   $("#planResult").innerHTML = `
   ${based || (p.hid && p.hid !== S.hid) ? `<div class="key-hint">${I("info")}<span>这份计划基于 ${based ? fmtDate(based.ts) : "之前"} 的诊断（匹配度 ${based ? based.score : "—"}），你已经重新诊断过。打勾进度会保留；想按新结果调整，可以在上方重新生成计划。</span></div>` : ""}
+  ${recheck ? `<div class="key-hint ok">${I("refresh")}<span>已经完整完成 ${doneDays} 天。把这段时间做成的练习如实写进简历，再复诊一次，看看职途地图又点亮了几站。</span><a class="btn btn-default btn-sm" href="#/app/diagnose">去复诊</a></div>` : ""}
   <div class="card">
     <div class="plan-summary">
-      <div><p class="eyebrow">${esc(p.job_title || S.diagnosis?.job_title || "")}${p.demo ? " · 演示模式" : ""}</p><h3 class="report-title" style="margin:0">30 天 · 每天不超过 ${fmtMin(p.daily_minutes)}</h3></div>
+      <div><p class="eyebrow">${esc(p.job_title || S.diagnosis?.job_title || "")}${p.demo ? (STATIC_MODE ? " · 示例体验" : " · 演示模式") : ""}</p><h3 class="report-title" style="margin:0">30 天 · 每天不超过 ${fmtMin(p.daily_minutes)}</h3></div>
       <div class="progress"><div class="progress-bar"><i style="width:${all.length ? done / all.length * 100 : 0}%"></i></div><small>已完成 ${done} / ${all.length} 项任务 · ${doneDays} 天全部完成（进度只保存在这台设备上）</small></div>
       <button class="btn btn-ghost btn-sm" type="button" data-action="print">${I("printer")}打印 / 存为 PDF</button>
     </div>
@@ -816,7 +855,7 @@ function renderPlan(animate = false) {
   </div>
   <div class="card">
     <h3>${I("layers")}这 30 天要学会的软件和技能</h3>
-    <div class="skill-grid">${p.skills.map((k) => `<div class="skill"><b>${esc(k.skill)}</b><small>${esc(dayRange(k.days))}</small>
+    <div class="skill-grid">${p.skills.map((k) => `<div class="skill"><b>${esc(k.skill)}${weakItems.has(k.gap) ? `<span class="iv-flag">面试暴露</span>` : ""}</b><small>${esc(dayRange(k.days))}</small>
       ${k.gap ? `<p>对应差距：${esc(k.gap)}</p>` : ""}${k.tools.length ? `<div class="jc-tools">${k.tools.map((t) => `<em>${esc(t)}</em>`).join("")}</div>` : ""}</div>`).join("")}</div>
     ${p.tools.length ? `<p class="tool-line"><b>软件 / 工具清单：</b>${p.tools.map(esc).join("、")}</p>` : ""}
     <div class="plan-extra">
@@ -858,19 +897,38 @@ const ROUNDS = 5;
 function ivProgress() { $("#ivProgress").innerHTML = Array.from({ length: ROUNDS }, (_, i) => `<i class="${i < S.history.length ? "on" : i === S.history.length && S.current ? "cur" : ""}"></i>`).join(""); }
 function addMsg(who, html) {
   $("#ivChat").insertAdjacentHTML("beforeend", `<div class="msg ${who === "me" ? "me" : ""}"><span class="avatar">${I(who === "me" ? "user" : "bot")}</span><div class="bubble">${html}</div></div>`);
-  $("#ivChat").lastElementChild.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  const msg = $("#ivChat").lastElementChild;
+  msg.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  return msg;
 }
 $("#btnIvStart").addEventListener("click", (e) => {
   S.history = []; S.current = null; $("#ivChat").innerHTML = ""; $("#ivResult").innerHTML = ""; ivProgress();
   e.currentTarget.innerHTML = `${I("refresh")}重新开始`;
   busy(e.currentTarget, "准备中", nextQuestion);
 });
+const thinking = () => $("#ivChat .msg.pending");
 async function nextQuestion() {
-  const r = await api("/api/interview", { diagnosis: S.diagnosis, history: S.history, rounds: ROUNDS });
+  const ending = S.history.length >= ROUNDS;
+  if (!thinking()) addMsg("bot", `<span class="sk-msg"><span class="spin"></span>面试官正在准备第一题…</span>`).classList.add("pending");
+  let last = null, queued = false;
+  const onProgress = (p) => {   // show the question as the model writes it
+    last = p; if (queued) return; queued = true;
+    requestAnimationFrame(() => {
+      queued = false; const b = thinking(); if (!b) return;
+      const q = ending ? "" : partialString(last.text, "question");
+      $(".bubble", b).innerHTML = q ? `<span class="typing">${esc(q)}</span>` : `<span class="sk-msg"><span class="spin"></span>${ending ? `正在评估你的整体表现…已生成 ${last.chars} 字` : "面试官正在组织问题…"}</span>`;
+    });
+  };
+  let r;
+  try { r = await api("/api/interview", { diagnosis: S.diagnosis, history: S.history, rounds: ROUNDS }, null, onProgress); }
+  finally { const t = thinking(); if (t) t.remove(); }
   if (r.done) { S.current = null; ivProgress(); $("#ivComposer").classList.add("hidden"); return renderIvResult(r); }
   S.current = r.question; ivProgress();
   addMsg("bot", `<small>第 ${r.index} / ${r.rounds} 题 · ${esc(r.focus)}</small>${esc(r.question)}`);
-  $("#ivComposer").classList.remove("hidden"); $("#ivAnswer").value = ""; $("#cIv").textContent = "建议 80～300 字"; $("#ivAnswer").focus({ preventScroll: true });
+  $("#ivComposer").classList.remove("hidden"); $("#ivAnswer").value = ""; $("#cIv").textContent = "建议 80～300 字";
+  const sample = S.demo && browserClient?.demo?.interview?.[r.index - 1]?.answer;
+  if (sample) { $("#ivAnswer").value = sample; $("#cIv").textContent = "示例回答（虚构人物），可以直接提交，也可以改成你自己的"; }
+  $("#ivAnswer").focus({ preventScroll: true });
 }
 $("#ivAnswer").addEventListener("input", () => { const n = $("#ivAnswer").value.trim().length; $("#cIv").textContent = `${n} 字${n < 80 ? " · 再具体一点会更好" : ""}`; });
 $("#btnIvNext").addEventListener("click", (e) => {
@@ -880,8 +938,8 @@ $("#btnIvNext").addEventListener("click", (e) => {
   $("#ivComposer").classList.add("hidden");
   let ok = false;
   busy(e.currentTarget, "思考中", async () => {
-    addMsg("bot", `<span class="sk-msg"><span class="spin"></span>${S.history.length >= ROUNDS ? "正在评估你的整体表现…" : "面试官正在思考下一题…"}</span>`);
-    try { await nextQuestion(); ok = true; } finally { const t = $$("#ivChat .msg").find((m) => m.querySelector(".sk-msg")); if (t) t.remove(); }
+    addMsg("bot", `<span class="sk-msg"><span class="spin"></span>${S.history.length >= ROUNDS ? "正在评估你的整体表现…" : "面试官正在思考下一题…"}</span>`).classList.add("pending");
+    await nextQuestion(); ok = true;
   }).then(() => {
     if (ok) return;
     const last = S.history.pop(); S.current = last.q; ivProgress();   // let the student resend the same answer
@@ -898,16 +956,38 @@ function radar(scores) {
   const labels = keys.map((k, i) => { const [x, y] = pt(i, R + 22); return `<text x="${x}" y="${y + 4}" text-anchor="middle">${esc(k)}</text>`; }).join("");
   return `<svg class="radar" viewBox="0 0 260 240" role="img" aria-label="五维评分雷达图">${rings}${axes}<polygon points="${poly}" fill="rgba(14,159,142,.18)" stroke="#0E9F8E" stroke-width="2"/>${labels}</svg>`;
 }
+const ivRecords = (key) => getHist().filter((x) => x.key === key).flatMap((x) => x.iv || []).sort((a, b) => a.ts - b.ts);
 function renderIvResult(r) {
+  const key = S.diagnosis ? histKey(S.diagnosis) : null, before = key ? ivRecords(key) : [];
+  const prevIv = before.at(-1);
+  if (S.hid) updateHistory(S.hid, (x) => { x.iv = [...(x.iv || []), { ts: Date.now(), total: r.total }]; });
+  const weak = r.weak_items || [], dl = prevIv ? r.total - prevIv.total : 0;
   $("#ivResult").innerHTML = `<div class="card" style="margin-top:24px">
-    <p class="eyebrow">面试评价${r.demo ? " · 演示模式" : ""}</p><h3 class="report-title">综合 ${r.total} 分</h3>
+    <p class="eyebrow">面试评价${r.demo ? " · 示例" : ""}</p><h3 class="report-title">综合 ${r.total} 分${prevIv ? ` <span class="delta ${dl > 0 ? "up" : dl < 0 ? "down" : ""}">${dl === 0 ? "与上次持平" : `比上次 ${dl > 0 ? "+" : ""}${dl}`}</span>` : ""}</h3>
+    ${prevIv ? `<p class="muted small">同一岗位上次模拟面试：${fmtDate(prevIv.ts)}，${prevIv.total} 分</p>` : ""}
+    ${weak.length ? `<div class="weak-card"><div class="weak-head"><div><h4>${I("mic")}面试暴露的薄弱项</h4><p class="muted small">程序已核对：每一项都来自这次诊断的岗位要求，模型新编的条目会被丢弃。</p></div>
+      <button type="button" class="btn btn-primary btn-sm" id="btnWeak">${I("calendar")}加入 30 天计划重点</button></div>
+      <ul>${weak.map((w) => { const st = ST[w.status] || ST["缺少"]; return `<li><span class="st ${st[1]}">简历：${esc(w.status || "—")}</span><b>${esc(w.item)}</b><p>${esc(w.reason)}</p></li>`; }).join("")}</ul></div>` : ""}
     <div class="score-grid">${radar(r.scores)}
       <div class="dims">${Object.entries(r.scores).map(([k, v]) => `<div><span>${esc(k)}</span><span class="bar"><i style="width:${v * 20}%"></i></span><b>${v}/5</b>${r.reasons[k] ? `<p>${esc(r.reasons[k])}</p>` : ""}</div>`).join("")}</div></div>
     <h3 style="margin-top:24px">${I("bulb")}最重要的三点改进</h3>
     <div class="tips">${r.advice.map((x) => `<div class="tip">${I("arrow")}<span>${esc(x)}</span></div>`).join("")}</div>
     ${r.better_answer.answer ? `<h3 style="margin-top:24px">${I("quote")}回答示范</h3><div class="quote-box"><small>${esc(r.better_answer.question)}</small>${esc(r.better_answer.answer)}</div>` : ""}
     ${feedback("interview")}</div>`;
+  const wb = $("#btnWeak"); if (wb) wb.addEventListener("click", () => applyWeak(weak, wb));
   $("#ivResult").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+/* interview → diagnosis → plan: weak items become plan priorities even when the resume claims them */
+function applyWeak(weak, btn) {
+  if (!S.diagnosis) return;
+  const by = new Map(weak.map((w) => [w.item, w.reason]));
+  let n = 0;
+  S.diagnosis.requirements.forEach((r) => { if (by.has(r.item)) { r.interview_weak = true; r.interview_note = by.get(r.item); n++; } });
+  store.set("diagnosis", S.diagnosis);
+  if (S.hid) updateHistory(S.hid, (x) => { x.d = S.diagnosis; });
+  renderDiagnosis.quiet = true; renderDiagnosis(); syncSteps();
+  btn.outerHTML = `<a class="btn btn-default btn-sm" href="#/app/plan">${I("arrow")}去重新生成计划</a>`;
+  toast(`已把 ${n} 项标记为面试暴露的薄弱项，重新生成 30 天计划时会优先安排`);
 }
 
 /* ------------------------------------------------------------------ ask */
@@ -917,9 +997,9 @@ $("#askForm").addEventListener("submit", (e) => {
   const q = $("#question").value.trim(); if (q.length < 2) return toast("请输入问题");
   $("#askResult").innerHTML = skeleton("正在检索资料库…");
   busy($("#btnAsk"), "查询中", async () => {
-    const r = await api("/api/ask", { question: q });
+    const r = await api("/api/ask", { question: q }, null, live("#askResult", (t) => ({ text: t })));
     const html = esc(r.answer).replace(/\[(\d+)\]/g, (m, n) => `<button type="button" class="cite" data-n="${n}" aria-label="查看出处 ${n}">${n}</button>`);
-    $("#askResult").innerHTML = `<div class="card"><p class="eyebrow">回答${r.demo ? " · 演示模式" : ""}</p><div class="answer">${html}</div>
+    $("#askResult").innerHTML = `<div class="card"><p class="eyebrow">回答${r.demo ? (STATIC_MODE ? " · 示例体验" : " · 演示模式") : ""}</p><div class="answer">${html}</div>
       ${r.references.length ? `<div class="sources">${r.references.map((c) => `<div class="source" id="src${c.n}"><div class="source-top"><span class="cite">${c.n}</span>《${esc(c.title)}》${esc(c.section)}</div><p>${esc(c.text.slice(0, 220))}${c.text.length > 220 ? "…" : ""}</p><small>来源：${esc(c.source)}${c.date ? " · " + esc(c.date) : ""}${c.url ? ` · <a href="${esc(c.url)}" target="_blank" rel="noopener">原文</a>` : ""}</small></div>`).join("")}</div>`
         : `<p class="meta">${r.grounded ? "" : "没有引用资料库内容，请以学校老师的答复为准。"}</p>`}
       ${feedback("ask")}</div>`;
@@ -1011,6 +1091,8 @@ function syncSteps() {
   $("#st-interview").textContent = has ? "可以开始" : "需先诊断";
   ["#planNeed", "#ivNeed"].forEach((s) => $(s).classList.toggle("hidden", has));
   $("#planForm").classList.toggle("hidden", !has); $("#ivArea").classList.toggle("hidden", !has);
+  const weak = has ? S.diagnosis.requirements.filter((r) => r.interview_weak) : [], pw = $("#planWeak");
+  if (pw) { pw.hidden = !weak.length; pw.innerHTML = weak.length ? `${I("mic")}<span>已纳入模拟面试暴露的 ${weak.length} 项：${weak.map((r) => esc(r.item.length > 14 ? r.item.slice(0, 14) + "…" : r.item)).join("、")}。生成计划时会优先安排，并加入口头讲解练习。</span>` : ""; }
   if (!S.plan) $("#planResult").innerHTML = "";
   ivProgress();
 }
@@ -1024,6 +1106,9 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("[data-action=print]")) window.print();
   if (e.target.closest("[data-action=key]")) keySheet();
   if (e.target.closest("[data-action=history]")) historySheet();
+  if (e.target.closest("[data-action=demo]")) { if (STATIC_MODE) startDemo(); else { location.hash = "#/app/diagnose"; loadSample(); } }
+  if (e.target.closest("[data-action=demo-day30]")) demoDay30();
+  if (e.target.closest("[data-action=demo-exit]")) { location.hash = "#/app/jobs"; location.reload(); }
 });
 
 /* ------------------------------------------------------------------ boot */

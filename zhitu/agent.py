@@ -8,6 +8,7 @@ from . import prompts
 from .jobs import CATS, JobDB, mentions, normalize
 from .kb import KnowledgeBase
 from .llm import ModelError, extract_json
+from .evidence import locate
 from .privacy import mask
 
 STATUS = {"具备": 1.0, "部分具备": 0.5, "缺少": 0.0}
@@ -36,6 +37,23 @@ def _refs(chunks) -> str:
 def keyword_hits(req: dict, resume: str) -> list[str]:
     low = resume.lower()
     return [k for k in req.get("keywords", []) if k and mentions(k, low)][:6]
+
+
+def plan_gaps(diagnosis: dict) -> list[dict]:
+    """Items to work on, most urgent first. Requirements the mock interview exposed as weak are included
+    even when the resume shows them, and come first among equals (the interview → plan loop)."""
+    rank = {("必需", "缺少"): 0, ("必需", "部分具备"): 1, ("加分", "缺少"): 2, ("加分", "部分具备"): 3}
+    gaps = []
+    for r in diagnosis.get("requirements", []) or []:
+        if not isinstance(r, dict) or (r.get("status") == "具备" and not r.get("interview_weak")):
+            continue
+        g = dict(r)
+        if g.get("status") == "具备":
+            g["status"] = "部分具备"  # resume says yes, interview says not yet
+        gaps.append(g)
+    gaps.sort(key=lambda g: (rank.get((g.get("level", "必需"), g.get("status")), 4), not g.get("interview_weak"),
+                             -(g.get("count") or 0)))
+    return gaps
 
 
 class Agent:
@@ -100,15 +118,19 @@ class Agent:
     @staticmethod
     def verify_diagnosis(data: dict, resume_masked: str, refs, hidden: dict, fixed: bool = False) -> dict:
         """Programmatic checks: evidence must be a verbatim quote; score is computed, not guessed."""
-        reqs, flagged = [], 0
-        norm_resume = _norm(resume_masked)
+        reqs, flagged, corrected = [], 0, 0
         for r in (data.get("requirements") or [])[:15]:
             if not isinstance(r, dict) or not str(r.get("item", "")).strip():
                 continue
             status = r.get("status") if r.get("status") in STATUS else "缺少"
             evidence = str(r.get("evidence", "")).strip()
-            verified = bool(evidence) and _norm(evidence) in norm_resume
+            found = locate(evidence, resume_masked) if evidence else None
+            verified = bool(found)
             note = ""
+            if found and not found["exact"]:
+                corrected += 1  # small copy differences: show the resume's own words instead
+                evidence = found["text"]
+                note = "模型摘录与简历原文有细微差异，已替换为简历原文"
             if evidence and not verified:
                 flagged += 1
                 note = "模型给出的依据在简历中找不到原文，已降级处理"
@@ -140,7 +162,7 @@ class Agent:
             "honesty_notes": [str(s)[:120] for s in (data.get("honesty_notes") or [])][:5],
             "standard_note": str(data.get("standard_note", ""))[:200],
             "references": [c.cite() for c in refs],
-            "privacy": hidden, "unverified_evidence": flagged,
+            "privacy": hidden, "unverified_evidence": flagged, "corrected_evidence": corrected,
         }
 
     # ---------------------------------------------------------------- 30-day plan
@@ -151,16 +173,15 @@ class Agent:
             daily_hours = 2.0
         daily_hours = max(1.0, min(4.0, round(daily_hours * 2) / 2))
         daily = int(daily_hours * 60)
-        gaps = [r for r in diagnosis.get("requirements", []) if r.get("status") != "具备"]
+        gaps = plan_gaps(diagnosis)
         if not gaps:
             raise ModelError("诊断里没有需要补的项，可以直接准备投递和面试")
-        rank = {("必需", "缺少"): 0, ("必需", "部分具备"): 1, ("加分", "缺少"): 2, ("加分", "部分具备"): 3}
-        gaps.sort(key=lambda g: (rank.get((g.get("level", "必需"), g.get("status")), 4), -(g.get("count") or 0)))
         job = diagnosis.get("job") or {}
         learn_days = [d for d in range(1, 31) if d not in REVIEW_DAYS + PROJECT_DAYS + (INTERVIEW_DAY,)]
         brief = json.dumps({"job_title": diagnosis.get("job_title"),
                             "job_tools": job.get("tools", [])[:12],
-                            "gaps": [{k: g.get(k) for k in ("item", "category", "level", "status", "advice", "count")}
+                            "gaps": [{k: g.get(k) for k in ("item", "category", "level", "status", "advice", "count",
+                                                             "interview_weak", "interview_note") if g.get(k) is not None}
                                      for g in gaps[:10]]}, ensure_ascii=False)
         user = (f"每天可用时间：{daily} 分钟\n学习日共 {len(learn_days)} 天，学习日总时长约 {daily * len(learn_days)} 分钟\n"
                 f"差距诊断：{brief}")
@@ -294,16 +315,17 @@ class Agent:
                            ensure_ascii=False)
         user = f"【目标岗位与诊断】\n{brief}\n\n【简历】\n{resume_m}"
         data = extract_json(self.llm.chat(prompts.RESUME_TIPS, [{"role": "user", "content": user}], 2500))
-        norm_resume = _norm(resume_m)
         nums_in_resume = set(re.findall(r"\d+(?:\.\d+)?", resume_m))
         tips, dropped = [], 0
         for t in (data.get("rewrites") or [])[:8]:
             if not isinstance(t, dict):
                 continue
             orig, new = str(t.get("original", "")).strip(), str(t.get("rewrite", "")).strip()
-            if not orig or not new or _norm(orig) not in norm_resume:
+            found = locate(orig, resume_m) if orig and new else None
+            if not found:
                 dropped += 1  # the "original" must be copied from the resume
                 continue
+            orig = found["text"]
             invented = [n for n in re.findall(r"\d+(?:\.\d+)?", new) if n not in nums_in_resume]
             for n in invented:  # numbers the student never wrote become blanks to fill in honestly
                 new = re.sub(r"(?<![\d.])" + re.escape(n) + r"(?![\d.])", "（填写真实数字）", new)
@@ -351,7 +373,15 @@ class Agent:
                 except (TypeError, ValueError):
                     scores[k] = 3
             better = data.get("better_answer") or {}
-            return {"done": True, "scores": scores, "total": round(sum(scores.values()) / 25 * 100),
+            items = {str(r.get("item", "")): r for r in diagnosis.get("requirements", []) if isinstance(r, dict)}
+            weak, seen = [], set()
+            for w in data.get("weak_items") or []:
+                item = str((w or {}).get("item", "")).strip() if isinstance(w, dict) else ""
+                if item in items and item not in seen:   # must name a real requirement, never a new one
+                    seen.add(item)
+                    weak.append({"item": item, "reason": str(w.get("reason", "")).strip()[:60],
+                                 "status": items[item].get("status")})
+            return {"done": True, "weak_items": weak[:3], "scores": scores, "total": round(sum(scores.values()) / 25 * 100),
                     "reasons": {k: str((data.get("reasons") or {}).get(k, ""))[:120] for k in scores},
                     "advice": [str(s)[:100] for s in (data.get("advice") or [])][:3],
                     "better_answer": {"question": str(better.get("question", ""))[:200],

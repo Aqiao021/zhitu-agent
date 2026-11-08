@@ -1,0 +1,123 @@
+{
+  "note": "示例体验数据：人物、简历、回答均为虚构；模型输出为预先写好的示例，用来展示完整流程。程序核验、评分和 30 天排期照常运行。",
+  "job_id": "ai_app_dev_assistant",
+  "job_title": "人工智能应用开发工程师（初级）",
+  "resume_marker": "校园问答小程序（课程作业）",
+  "day30_marker": "【第 30 天更新】",
+  "resume": "【示例简历 · 人物为虚构】\n姓名：小林    电话：13800001234\n学校：漳州职业技术学院 人工智能技术应用专业 2026级\n技能：会使用 Python 写简单脚本；了解 Git 基本操作；能用大模型 API 做对话程序\n项目经历：\n1. 校园问答小程序（课程作业）：用 Python 调用大模型 API，实现按课程资料回答同学提问，负责接口调用和提示词编写。\n2. 班级活动报名表：用 Excel 和简单网页收集报名信息，组织 30 名同学试用并根据反馈修改。\n其他：担任班级学习委员，负责收集作业和组织学习小组。",
+  "resume_day30": "【示例简历 · 人物为虚构】【第 30 天更新】\n姓名：小林    电话：13800001234\n学校：漳州职业技术学院 人工智能技术应用专业 2026级\n技能：会用 Python、Pandas、Matplotlib 处理和可视化数据；会用 OpenCV 做图片读取、灰度化和人脸检测；会用 Flask 写接口；能在 Ubuntu 虚拟机里配置 Python 环境并写简单 Shell 脚本；了解 Git 基本操作；能用大模型 API 做对话程序\n项目经历：\n1. 课程成绩分析（30 天计划综合项目）：用 Pandas 清洗 200 条成绩数据，用 Matplotlib 画出分布图，并用 Flask 做成查询接口，部署在 Ubuntu 虚拟机上。\n2. 校园问答小程序（课程作业）：用 Python 调用大模型 API，实现按课程资料回答同学提问，负责接口调用和提示词编写。\n3. 班级活动报名表：用 Excel 和简单网页收集报名信息，组织 30 名同学试用并根据反馈修改。\n其他：担任班级学习委员，负责收集作业和组织学习小组。",
+  "diagnose": {
+    "summary": "有大模型 API 调用的小项目经验，是很好的起点；但岗位要求的 OpenCV、深度学习框架、Web 接口和 Linux 环境都还没有体现，必需项缺口较多。建议先补 Linux 环境和 Python 数据处理，再做一个从数据到接口的小项目。",
+    "results": [
+      {"n": 1, "status": "部分具备", "evidence": "会使用 Python 写简单脚本", "advice": "用 Pandas 清洗一份成绩表，用 Matplotlib 画 3 张图"},
+      {"n": 2, "status": "缺少", "evidence": "", "advice": "用 OpenCV 完成读图、灰度化、人脸检测三个小练习"},
+      {"n": 3, "status": "缺少", "evidence": "", "advice": "跟官方教程用 PyTorch 训练一个手写数字分类模型"},
+      {"n": 4, "status": "缺少", "evidence": "", "advice": "用 Flask 写一个接收图片、返回识别结果的接口"},
+      {"n": 5, "status": "部分具备", "evidence": "用 Python 调用大模型 API，实现按课程资料回答同学提问", "advice": "补上数据处理和部署环节，写清自己负责的部分"},
+      {"n": 6, "status": "缺少", "evidence": "", "advice": "在 Ubuntu 虚拟机里装好 Python 环境，写一个备份脚本"},
+      {"n": 7, "status": "具备", "evidence": "能使用大模型 API 做对话程序", "advice": "面试时讲清调用流程、密钥保管和失败重试"},
+      {"n": 8, "status": "具备", "evidence": "熟悉 RAG 检索增强生成和 Chroma 向量数据库", "advice": "把问答小程序改成 RAG 版本，记录效果对比"},
+      {"n": 9, "status": "缺少", "evidence": "", "advice": "用 jieba 给课程资料分词并统计高频词"},
+      {"n": 10, "status": "缺少", "evidence": "", "advice": "把 Flask 接口打包成 Docker 镜像并运行"}
+    ],
+    "strengths": ["做过调用大模型 API 的完整小项目", "有组织同学试用并根据反馈修改的经历", "担任学习委员，沟通协作有实例"],
+    "honesty_notes": ["“校园问答小程序”是课程作业，简历中可以注明，并写清自己负责接口调用和提示词编写"],
+    "standard_note": "岗位中的模型训练与部署对应国家职业标准中人工智能工程技术人员的相关工作内容 [1]。"
+  },
+  "diagnose_day30": {
+    "summary": "30 天里补上了 Python 数据处理、Flask 接口和 Linux 环境，并做出一个能演示的综合项目，进步明显；深度学习框架和 Docker 仍是主要缺口，建议作为下一阶段重点。",
+    "results": [
+      {"n": 1, "status": "具备", "evidence": "会用 Python、Pandas、Matplotlib 处理和可视化数据", "advice": "面试时用成绩分析项目举例，说清清洗了哪些问题数据"},
+      {"n": 2, "status": "部分具备", "evidence": "会用 OpenCV 做图片读取、灰度化和人脸检测", "advice": "再完成一个视频逐帧处理的练习"},
+      {"n": 3, "status": "缺少", "evidence": "", "advice": "用 PyTorch 训练手写数字分类模型，记录准确率"},
+      {"n": 4, "status": "具备", "evidence": "会用 Flask 写接口", "advice": "补充接口文档和异常处理，面试时能现场演示"},
+      {"n": 5, "status": "部分具备", "evidence": "用 Pandas 清洗 200 条成绩数据，用 Matplotlib 画出分布图，并用 Flask 做成查询接口", "advice": "项目还缺模型训练环节，可加入一个简单预测模型"},
+      {"n": 6, "status": "部分具备", "evidence": "能在 Ubuntu 虚拟机里配置 Python 环境并写简单 Shell 脚本", "advice": "了解 GPU 驱动和 CUDA 的安装步骤并做笔记"},
+      {"n": 7, "status": "具备", "evidence": "能用大模型 API 做对话程序", "advice": "准备一个调用失败时如何处理的例子"},
+      {"n": 8, "status": "部分具备", "evidence": "负责接口调用和提示词编写", "advice": "把问答小程序改成 RAG 版本"},
+      {"n": 9, "status": "缺少", "evidence": "", "advice": "用 jieba 给课程资料分词并统计高频词"},
+      {"n": 10, "status": "缺少", "evidence": "", "advice": "把 Flask 接口打包成 Docker 镜像并运行"}
+    ],
+    "strengths": ["有一个从数据清洗到接口部署的完整小项目", "能在 Linux 下独立配置环境", "大模型 API 调用经验"],
+    "honesty_notes": [],
+    "standard_note": "模型封装为接口并部署，对应国家职业标准中人工智能工程技术人员的部署相关工作内容 [1]。"
+  },
+  "plan": {
+    "modules": [
+      {"skill": "Linux 环境与 Shell", "gap": "会在Linux下配置Python和深度学习环境（含显卡驱动），写简单Shell脚本", "tools": ["VirtualBox", "Ubuntu", "Shell"],
+        "tasks": [
+          {"title": "安装 VirtualBox 和 Ubuntu 虚拟机，熟悉终端", "minutes": 90, "output": "能用 ls、cd、mkdir 等 10 个命令完成文件操作"},
+          {"title": "在 Ubuntu 中用 venv 建 Python 环境并安装 Pandas", "minutes": 60, "output": "虚拟环境里能 import pandas"},
+          {"title": "写一个 Shell 脚本，每天把作业文件夹打包备份", "minutes": 60, "output": "脚本能运行并生成带日期的压缩包"},
+          {"title": "阅读 PyTorch 官方安装说明，整理 GPU 驱动与 CUDA 关系", "minutes": 45, "output": "一页笔记：驱动、CUDA、PyTorch 版本对应"}
+        ]},
+      {"skill": "OpenCV 图像处理", "gap": "能用OpenCV完成图像和视频处理", "tools": ["OpenCV", "Python"],
+        "tasks": [
+          {"title": "用 OpenCV 读取、缩放、灰度化并保存图片", "minutes": 60, "output": "处理前后对比图各 3 张"},
+          {"title": "用 Haar 级联完成照片中的人脸检测并画框", "minutes": 90, "output": "能在 5 张照片中框出人脸"},
+          {"title": "读取一段视频，逐帧转灰度并另存", "minutes": 90, "output": "生成处理后的视频文件"},
+          {"title": "对着题目口头讲解 OpenCV 处理流程并录音复述", "minutes": 30, "output": "2 分钟录音，能讲清每一步作用"}
+        ]},
+      {"skill": "Flask 接口开发", "gap": "能用Flask、Django或FastAPI把模型封装成Web接口", "tools": ["Flask", "Postman"],
+        "tasks": [
+          {"title": "跟官方文档写出 Flask 的 Hello World 接口", "minutes": 60, "output": "浏览器访问能返回 JSON"},
+          {"title": "写一个接收图片、返回人脸数量的接口", "minutes": 120, "output": "用 Postman 上传图片能得到正确结果"},
+          {"title": "给接口加参数校验和错误提示，写接口说明", "minutes": 90, "output": "一页接口文档，含请求和返回示例"},
+          {"title": "对着题目口头讲解接口如何接收参数和返回结果", "minutes": 30, "output": "能不看笔记讲清请求到返回的过程"}
+        ]},
+      {"skill": "Python 数据处理与可视化", "gap": "熟练用Python编程，会用NumPy、Pandas、Matplotlib处理和可视化数据", "tools": ["Pandas", "NumPy", "Matplotlib", "Jupyter"],
+        "tasks": [
+          {"title": "用 NumPy 完成数组运算和统计的 20 道练习", "minutes": 90, "output": "练习笔记本全部运行通过"},
+          {"title": "用 Pandas 读取成绩表，处理缺失值和重复行", "minutes": 120, "output": "清洗后的表格和处理说明"},
+          {"title": "用 Matplotlib 画柱状图、折线图、散点图各 1 张", "minutes": 90, "output": "3 张带标题和坐标轴说明的图"},
+          {"title": "按班级分组统计平均分并导出 Excel", "minutes": 60, "output": "导出的统计表"}
+        ]},
+      {"skill": "AI 综合项目经验", "gap": "完成过至少1个AI综合项目（从数据处理、训练到部署）", "tools": ["Git", "Markdown"],
+        "tasks": [
+          {"title": "梳理问答小程序：画出流程图，写清自己负责的部分", "minutes": 60, "output": "流程图和 300 字项目说明"},
+          {"title": "把问答小程序代码整理后上传到 Git 仓库", "minutes": 60, "output": "仓库含 README 和运行说明"},
+          {"title": "对着题目口头讲解项目难点和解决过程并录音", "minutes": 30, "output": "2 分钟录音，含一个遇到的问题和解法"}
+        ]},
+      {"skill": "PyTorch 入门", "gap": "能用TensorFlow或PyTorch训练并测试图像分类、目标检测等模型", "tools": ["PyTorch"],
+        "tasks": [
+          {"title": "跟官方入门教程跑通 MNIST 手写数字分类", "minutes": 120, "output": "训练日志和测试准确率截图"},
+          {"title": "修改网络层数和学习率，对比 2 次训练结果", "minutes": 120, "output": "一张对比表和结论"}
+        ]}
+    ],
+    "final_project": {"title": "课程成绩分析与查询接口", "desc": "用 Pandas 清洗成绩数据并可视化，用 Flask 做查询接口，部署到 Ubuntu 虚拟机", "output": "可演示的接口、3 张图表和一页项目说明"},
+    "tips": ["每天先做最难的任务，卡住超过 30 分钟就记下问题去问老师同学", "所有练习都存进同一个 Git 仓库，方便写进简历", "复盘日不学新东西，只整理和重做"]
+  },
+  "resume_tips": {
+    "rewrites": [
+      {"original": "校园问答小程序（课程作业）：用 Python 调用大模型 API，实现按课程资料回答同学提问，负责接口调用和提示词编写。", "rewrite": "校园问答小程序（课程作业）：负责用 Python 调用大模型 API 和编写提示词，实现按课程资料回答同学提问，累计服务 50 名同学。", "requirement": "完成过至少1个AI综合项目（从数据处理、训练到部署）", "why": "先写自己负责什么，再写成果，面试官更容易追问"},
+      {"original": "会使用 Python 写简单脚本", "rewrite": "使用 Python 编写数据处理和接口调用脚本（见校园问答小程序）", "requirement": "熟练用Python编程，会用NumPy、Pandas、Matplotlib处理和可视化数据", "why": "把技能和具体项目对应起来，避免空泛"},
+      {"original": "班级活动报名表：用 Excel 和简单网页收集报名信息，组织 30 名同学试用并根据反馈修改。", "rewrite": "班级活动报名表：用 Excel 和简单网页收集报名信息，组织 30 名同学试用，根据反馈完成修改。", "requirement": "通用素养", "why": "保留真实数字，突出“收集反馈—改进”的过程"}
+    ],
+    "questions": ["问答小程序是几个人一起做的？你具体写了哪些代码？", "大概有多少同学真正用过这个小程序？", "调用大模型 API 时遇到过哪些错误，你是怎么解决的？", "报名表网页是用什么工具做的？"]
+  },
+  "interview": [
+    {"question": "简历里的校园问答小程序，你能讲讲整体流程吗？用户提问之后，程序是怎么一步步得到回答的？", "focus": "项目表达", "answer": "同学在网页输入问题后，我的 Python 程序把问题和课程资料一起拼进提示词，调用大模型 API，拿到回答再显示出来。课程资料是老师给的几份讲义，我先手动整理成文本。"},
+    {"question": "你说把课程资料拼进提示词，资料很多的时候会超出长度限制，你当时怎么处理的？", "focus": "问题追问", "answer": "当时资料不多，没有遇到这个问题。后来了解到可以先检索出相关段落再放进去，也就是 RAG，但我还没有实际做过。"},
+    {"question": "这个岗位需要把模型封装成 Web 接口。如果让你用 Flask 写一个接口，接收一张图片并返回识别结果，你会怎么设计？", "focus": "接口开发", "answer": "我会写一个 POST 接口接收图片，然后调用模型识别，再把结果返回给前端。具体参数怎么接收我还不太熟，需要查文档。"},
+    {"question": "调用大模型 API 时，你的密钥是怎么保存的？如果接口调用失败或超时，程序会怎么处理？", "focus": "工程习惯", "answer": "密钥当时直接写在代码里了，现在知道应该放进环境变量。失败的时候程序会报错，我没有专门做重试。"},
+    {"question": "如果入职后要你在一周内学会用 OpenCV 做图片预处理，你会怎么安排学习？", "focus": "学习能力", "answer": "我会先看官方教程把读图、缩放、灰度这些基础操作跑一遍，再找一个人脸检测的例子照着做，每天记录遇到的问题，最后做一个小练习给导师看。"}
+  ],
+  "interview_end": {
+    "scores": {"专业知识": 2, "项目表达": 3, "问题解决": 2, "沟通表达": 4, "岗位匹配": 2},
+    "reasons": {
+      "专业知识": "对 RAG 和 Flask 参数接收表示“还没有实际做过”“还不太熟”",
+      "项目表达": "能讲清问答小程序“拼进提示词，调用大模型 API”的流程",
+      "问题解决": "调用失败时“没有专门做重试”，缺少处理思路",
+      "沟通表达": "回答坦诚清楚，主动说明哪些还不会",
+      "岗位匹配": "岗位必需的接口开发和深度学习经验目前较少"
+    },
+    "advice": ["动手写一个 Flask 图片接口，面试时能讲清参数和返回格式", "把密钥放进环境变量，并给 API 调用加上超时和重试", "用 STAR 方法准备问答小程序的 2 分钟介绍，突出自己负责的部分"],
+    "better_answer": {"question": "调用大模型 API 时，你的密钥是怎么保存的？如果接口调用失败或超时，程序会怎么处理？", "answer": "做小程序时我把密钥直接写在代码里，后来意识到有泄露风险，已经改成从环境变量读取。调用失败时当时只会报错，现在我会设置超时时间，遇到限流等可重试的错误最多重试两次，并给用户一个友好提示。"},
+    "weak_items": [
+      {"item": "能用Flask、Django或FastAPI把模型封装成Web接口", "reason": "说不清接口如何接收参数和返回结果"},
+      {"item": "会调用AI云平台的视觉、语音或NLP接口（如百度AI开放平台）", "reason": "密钥直接写在代码里，没有失败重试"},
+      {"item": "完成过至少1个AI综合项目（从数据处理、训练到部署）", "reason": "项目只有调用接口，缺少数据处理和部署"},
+      {"item": "精通分布式训练", "reason": "示例：程序会丢弃不在岗位要求里的条目"}
+    ]
+  }
+}
